@@ -1,0 +1,7 @@
+xmls/
+*.pfx
+*.p12
+*.exe
+nsu.json
+config.json
+cobertura*
