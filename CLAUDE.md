@@ -88,6 +88,6 @@ O mês vem de `<dhProc>` (emissão, não competência), formato `AAAA-MM` para o
 7. **Na dúvida entre repetir e pular um NSU, repita.** Arquivo é sobrescrito; nota pulada some para sempre. O ponteiro só avança quando o lote inteiro gravou (`falhasDeGravacao == 0`).
 8. **Pendência não é erro.** `downloadRoot` devolve `err == nil` **com uma `Pendencia` dentro** quando o certificado está vencido, não abre ou não existe. É de propósito: no `--todas`, uma empresa quebrada não pode parar as outras 236. Quem consome o resultado precisa checar `len(resultado.Pendencias) > 0`, não só o `err`. Isso já causou bug — a tela mostrava pílula **verde** "Nada novo" para certificado vencido.
 
-## README desatualizado
+## README
 
-O `README.md` descreve a estrutura de saída antiga (`NFSE/` e `EVENTO/` por empresa), não menciona `--empresa`, `--todas` nem `clientesCSV`, e omite os padrões automáticos de configuração. Prefira este arquivo; atualize o README quando mexer nessas áreas.
+O `README.md` é público e serve de portfólio — mantenha ele em dia quando mudar comandos, estrutura de saída ou configuração. **Nunca cite nome de cliente, CNPJ real, caminho de rede do escritório ou IP interno lá.**
