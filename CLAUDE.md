@@ -9,20 +9,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Comandos
 
 ```bash
-go build .                              # compilar
+go build .                              # compilar para desenvolver (com console)
 go test ./...                           # todos os testes
 go test -run TestExtractPassword        # um teste só
 
+# o binário que o auxiliar recebe: sem janela preta
+go build -ldflags="-H=windowsgui" -o portalnacional.exe .
+
+go run .                                # sem argumento = a tela (é onde o duplo clique cai)
+go run . --tela                         # idem, explícito
 go run . --scan                         # lista os .pfx e a senha extraída de cada nome
 go run . --cert <raiz8>                 # mostra caminho e senha de uma raiz
 go run . --empresa <raiz8> [cnpj14...]  # baixa uma empresa; sem cnpj, lê os do CSV
 go run . --todas [limite]               # todas as empresas do CSV; limite corta a lista
 go run . --resetar <raiz8|cnpj14>       # apaga o ponteiro; a próxima execução rebaixa tudo
-go run . --tela                         # interface web em http://localhost:8080
 go run . <arquivo.pfx> <senha> [cnpj14] # modo direto, sem CSV
 ```
 
-O `--tela` embute o HTML no binário, então **mudança na página exige reiniciar o servidor** (Ctrl+C e rodar de novo) — o processo antigo continua servindo a versão velha.
+⚠️ **O `.exe` de release não serve para linha de comando.** `-H=windowsgui` produz um binário sem saída padrão: `--scan`, `--todas` e `--cert` rodariam sem imprimir nada. Use `go run .` para esses — ele compila sem a flag e mantém o terminal.
+
+A tela embute o HTML no binário, então **mudança na página exige recompilar e reiniciar** — o processo antigo continua servindo a versão velha. E como o executável fica travado enquanto roda, o `go build` renomeia o antigo para `portalnacional.exe~` em vez de falhar; esse arquivo é lixo, pode apagar (e já causou confusão: com as extensões escondidas no Explorer, ele parece o programa e o duplo clique nele não faz nada).
 
 `--empresa <raiz8> <cnpj14>` é o modo de teste mais útil: pula o CSV e baixa um CNPJ só.
 
