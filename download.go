@@ -65,11 +65,11 @@ func downloadRoot(config Config, state NSUState, root string, cnpjs []string, ta
 	safeName := strings.NewReplacer("/", "-", `\`, "-", ":", "-").Replace(companyName)
 	result.Folder = filepath.Join(config.XMLBaseDir, safeName+"_"+root)
 
-	fmt.Printf("\n=== %s (raiz %s) - validade %s ===\n",
+	log.Printf("=== %s (raiz %s) - validade %s ===",
 		companyName, root, companyCert.NotAfter.Format("02/01/2006"))
 
 	if time.Now().After(companyCert.NotAfter) {
-		fmt.Println("ATENÇÃO: certificado vencido - pulando empresa")
+		log.Println("ATENÇÃO: certificado vencido - pulando empresa")
 
 		result.Issues = append(result.Issues, Issue{
 			Root:   root,
@@ -85,7 +85,7 @@ func downloadRoot(config Config, state NSUState, root string, cnpjs []string, ta
 			time.Sleep(pauseBetweenBatches)
 		}
 
-		fmt.Println("Consultando:", cnpj)
+		log.Println("Consultando:", cnpj)
 		task.startStep(i+1, len(cnpjs))
 
 		saved, failed, err := downloadCNPJ(httpClient, config, state, companyName, cnpj, task)
@@ -130,9 +130,9 @@ func downloadCNPJ(httpClient *http.Client, config Config, state NSUState, compan
 	createdDirs := map[string]bool{}
 
 	if currentNSU > 0 {
-		fmt.Printf("Retomando do NSU %d\n", currentNSU)
+		log.Printf("Retomando do NSU %d", currentNSU)
 	} else {
-		fmt.Println("Primeira execução - baixando desde o início")
+		log.Println("Primeira execução - baixando desde o início")
 	}
 
 	for {
@@ -144,17 +144,17 @@ func downloadCNPJ(httpClient *http.Client, config Config, state NSUState, compan
 		}
 
 		if distribution.StatusProcessamento == "NENHUM_DOCUMENTO_LOCALIZADO" {
-			fmt.Println("Nenhum documento localizado.")
+			log.Println("Nenhum documento localizado.")
 			break
 		}
 
 		if len(distribution.LoteDFe) == 0 {
-			fmt.Println("Lote vazio - encerrando.")
+			log.Println("Lote vazio - encerrando.")
 			break
 		}
 
 		batchCount++
-		fmt.Printf("Lote %d: %d documentos a partir do NSU %d (busca %.1fs)\n",
+		log.Printf("Lote %d: %d documentos a partir do NSU %d (busca %.1fs)",
 			batchCount, len(distribution.LoteDFe), currentNSU, fetchDuration.Seconds())
 
 		savedBefore, failedBefore := savedCount, failedCount
@@ -207,7 +207,7 @@ func downloadCNPJ(httpClient *http.Client, config Config, state NSUState, compan
 		}
 
 		if highestNSU <= currentNSU {
-			fmt.Println("NSU não avançou - encerrando por segurança.")
+			log.Println("NSU não avançou - encerrando por segurança.")
 			break
 		}
 
@@ -220,10 +220,10 @@ func downloadCNPJ(httpClient *http.Client, config Config, state NSUState, compan
 
 		task.progress(savedCount-savedBefore, failedCount-failedBefore)
 
-		time.Sleep(2 * time.Second)
+		time.Sleep(pauseBetweenBatches)
 	}
 
-	fmt.Printf("\nLotes: %d, Documentos salvos: %d, Falhas: %d | Último NSU: %d\n",
+	log.Printf("Lotes: %d, Documentos salvos: %d, Falhas: %d | Último NSU: %d",
 		batchCount, savedCount, failedCount, currentNSU)
 
 	return savedCount, failedCount, nil

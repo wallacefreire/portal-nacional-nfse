@@ -5,3 +5,4 @@ xmls/
 nsu.json
 config.json
 cobertura*
+*.log

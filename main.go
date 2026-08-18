@@ -7,10 +7,33 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
+	"unsafe"
 )
 
+type fileAndScreen struct {
+	file *os.File
+}
+
+func (writer fileAndScreen) Write(line []byte) (int, error) {
+	os.Stdout.Write(line)
+	return writer.file.Write(line)
+}
+
+func startLog() {
+	file, err := os.OpenFile(besideExe("portalnacional.log"),
+		os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		return
+	}
+
+	log.SetOutput(fileAndScreen{file})
+}
+
 func main() {
+	startLog()
+
 	config, err := loadConfig(findConfig())
 	if err != nil {
 		fatal("Erro ao carregar a configuração: ", err)
@@ -209,8 +232,23 @@ func main() {
 }
 
 func fatal(message ...any) {
-	log.Println(message...)
-	fmt.Print("\nPressione Enter para fechar...")
-	fmt.Scanln()
+	text := fmt.Sprint(message...)
+
+	log.Println(text)
+	showError(text)
+
 	os.Exit(1)
+}
+
+func showError(text string) {
+	user32 := syscall.NewLazyDLL("user32.dll")
+	messageBox := user32.NewProc("MessageBoxW")
+
+	title, _ := syscall.UTF16PtrFromString("NFS-e")
+	body, _ := syscall.UTF16PtrFromString(text)
+
+	messageBox.Call(0,
+		uintptr(unsafe.Pointer(body)),
+		uintptr(unsafe.Pointer(title)),
+		0x10)
 }
