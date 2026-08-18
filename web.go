@@ -44,6 +44,9 @@ var page = template.Must(template.New("page").Parse(`<!doctype html>
   }
 
   header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
     background: linear-gradient(135deg, var(--azul-fundo), var(--azul));
     border-bottom: 4px solid var(--verde);
     padding: .85rem 2rem .85rem 8.5rem;
@@ -53,7 +56,7 @@ var page = template.Must(template.New("page").Parse(`<!doctype html>
   }
 
   .marca {
-    height: 100px;
+    height: 48px;
     width: auto;
     display: block;
   }
@@ -79,7 +82,7 @@ var page = template.Must(template.New("page").Parse(`<!doctype html>
 
   .busca-area {
     position: sticky;
-    top: 0;
+    top: 75px;
     background: var(--cinza);
     padding: 1rem 0 .6rem;
     z-index: 10;
