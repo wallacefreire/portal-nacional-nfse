@@ -17,7 +17,7 @@ var logoPNG []byte
 //go:embed fundo.png
 var fundoPNG []byte
 
-var pagina = template.Must(template.New("pagina").Parse(`<!doctype html>
+var page = template.Must(template.New("page").Parse(`<!doctype html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
@@ -351,48 +351,48 @@ for (const li of itens) {
 </body>
 </html>`))
 
-func servirWeb(config Config, endereco string) error {
-	companies, err := loadCompanies(config.ClientesCSV)
+func serveWeb(config Config, address string) error {
+	companies, err := loadCompanies(config.ClientsCSV)
 	if err != nil {
 		return err
 	}
 
-	lista := make([]*Company, 0, len(companies))
+	list := make([]*Company, 0, len(companies))
 	for _, company := range companies {
-		lista = append(lista, company)
+		list = append(list, company)
 	}
-	sort.Slice(lista, func(i, j int) bool { return lista[i].Name < lista[j].Name })
+	sort.Slice(list, func(i, j int) bool { return list[i].Name < list[j].Name })
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if err := pagina.Execute(w, lista); err != nil {
+		if err := page.Execute(w, list); err != nil {
 			log.Println("erro ao montar a página:", err)
 		}
 	})
 
 	http.HandleFunc("/baixar", func(w http.ResponseWriter, r *http.Request) {
-		empresa := companies[r.URL.Query().Get("raiz")]
-		if empresa == nil {
+		company := companies[r.URL.Query().Get("raiz")]
+		if company == nil {
 			http.Error(w, "Empresa não encontrada", http.StatusNotFound)
 			return
 		}
 
-		tarefa, err := iniciarDownload(config, empresa)
+		task, err := startDownload(config, company)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}
 
-		responderJSON(w, tarefa)
+		respondJSON(w, task)
 	})
 
 	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
-		tarefa := lerTarefa(r.URL.Query().Get("raiz"))
-		if tarefa == nil {
+		task := readTask(r.URL.Query().Get("raiz"))
+		if task == nil {
 			http.Error(w, "Nenhum download para essa empresa", http.StatusNotFound)
 			return
 		}
 
-		responderJSON(w, tarefa)
+		respondJSON(w, task)
 	})
 
 	http.HandleFunc("/logo.png", func(w http.ResponseWriter, r *http.Request) {
@@ -400,25 +400,25 @@ func servirWeb(config Config, endereco string) error {
 		w.Write(logoPNG)
 	})
 
-	listener, err := net.Listen("tcp", endereco)
+	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		return err
 	}
 
-	log.Println("servidor no ar em http://" + endereco + " - Ctrl+C para encerrar")
-	abrirNavegador("http://" + endereco)
+	log.Println("servidor no ar em http://" + address + " - Ctrl+C para encerrar")
+	openBrowser("http://" + address)
 
 	return http.Serve(listener, nil)
 }
 
-func responderJSON(w http.ResponseWriter, dados any) {
+func respondJSON(w http.ResponseWriter, data any) {
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(dados); err != nil {
+	if err := json.NewEncoder(w).Encode(data); err != nil {
 		log.Println("erro ao responder JSON:", err)
 	}
 }
 
-func abrirNavegador(url string) {
+func openBrowser(url string) {
 	if err := exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start(); err != nil {
 		log.Println("Não consegui abrir o navegador. Acesse " + url + " manualmente.")
 	}

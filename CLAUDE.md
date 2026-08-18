@@ -2,7 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Código, comentários, mensagens de erro e testes estão em **português**. Mantenha esse padrão.
+**Identificador em inglês, texto em português.** Nome de função, tipo, campo, variável, arquivo e teste é escrito em inglês (o repositório é público e serve de portfólio). Tudo que um humano lê continua em português: comentários, mensagens de erro, textos da tela, as flags de linha de comando (`--tela`, `--todas`), os **valores** das constantes (`IssueExpired = "Certificado Vencido"`) e as **tags JSON**.
+
+⚠️ Tag JSON não se renomeia junto com o campo. As tags do `Config` apontam para o `config.json` em disco e as do `Task` alimentam o JavaScript da página — mexer nelas não dá erro de compilação, o programa sobe com os padrões e a tela nunca sai de "Baixando...".
 
 ## Comandos
 
@@ -28,21 +30,21 @@ O programa decide o que baixar **só pelo ponteiro, nunca olhando o disco** — 
 
 ## Arquitetura
 
-Package `main` único, arquivos divididos por assunto: `adn.go` (HTTP e API), `certificado.go` (.pfx e mTLS), `clientes.go` (CSV), `config.go`, `download.go` (orquestração e gravação), `estado.go` (ponteiro), `main.go` (modos de linha de comando), `web.go` (a página e as rotas), `tarefas.go` (downloads em segundo plano).
+Package `main` único, arquivos divididos por assunto: `adn.go` (HTTP e API), `certificate.go` (.pfx e mTLS), `clients.go` (CSV), `config.go`, `download.go` (orquestração e gravação), `state.go` (ponteiro), `main.go` (modos de linha de comando), `web.go` (a página e as rotas), `tasks.go` (downloads em segundo plano).
 
 ### A interface web
 
-Alvo final do projeto: os auxiliares contábeis operam por tela, não por linha de comando. `servirWeb` lê o CSV **uma vez na subida**, ordena e guarda numa closure — a busca das ~237 empresas acontece no navegador, não no servidor.
+Alvo final do projeto: os auxiliares contábeis operam por tela, não por linha de comando. `serveWeb` lê o CSV **uma vez na subida**, ordena e guarda numa closure — a busca das ~237 empresas acontece no navegador, não no servidor.
 
-O download não pode responder na mesma requisição: a primeira carga de uma empresa leva minutos e o navegador desiste antes. Então `/baixar` dispara uma **goroutine** e responde na hora; a página pergunta `/status` a cada 2s. O estado fica num `map[raiz]*Tarefa` protegido por mutex, e `lerTarefa` devolve **cópia**, nunca o ponteiro.
+O download não pode responder na mesma requisição: a primeira carga de uma empresa leva minutos e o navegador desiste antes. Então `/baixar` dispara uma **goroutine** e responde na hora; a página pergunta `/status` a cada 2s. O estado fica num `map[raiz]*Task` protegido por mutex, e `readTask` devolve **cópia**, nunca o ponteiro.
 
-**Um download por vez, de propósito** (`iniciarDownload` recusa se houver outro rodando): o `nsu.json` é um arquivo só, e dois downloads simultâneos sobrescreveriam o ponteiro um do outro. Impedir é mais barato que administrar.
+**Um download por vez, de propósito** (`startDownload` recusa se houver outro rodando): o `nsu.json` é um arquivo só, e dois downloads simultâneos sobrescreveriam o ponteiro um do outro. Impedir é mais barato que administrar.
 
 ⚠️ O HTML/CSS/JS vive dentro de uma **string crua do Go delimitada por crase** — não use crase no JavaScript (nada de template literal), ela encerra a string. Monte URL com `+`.
 
 ⚠️ `hidden` não funciona em elemento com `display` declarado. Toda vez que o JS usar `hidden`, precisa da regra `[hidden] { display: none; }` junto — já pegou o `li` da lista e o botão de limpar a busca.
 
-`servirWeb` separa `net.Listen` de `http.Serve` de propósito: a porta precisa estar aceitando **antes** de o navegador ser chamado, senão a página abre em "não foi possível conectar". Abrir o navegador (`abrirNavegador`, via `rundll32`) é conveniência — se falhar, só registra no log e o servidor continua.
+`serveWeb` separa `net.Listen` de `http.Serve` de propósito: a porta precisa estar aceitando **antes** de o navegador ser chamado, senão a página abre em "não foi possível conectar". Abrir o navegador (`openBrowser`, via `rundll32`) é conveniência — se falhar, só registra no log e o servidor continua.
 
 ### O modelo NSU — o conceito que explica o resto
 
@@ -62,7 +64,7 @@ Três consequências que orientam o código todo:
 
 ### Estado
 
-`NSUState` é um `map[cnpj]nsu` em JSON. Gravado **a cada lote** com escrita atômica (temp + rename). Se a gravação falhar, `ErrEstadoNaoSalvo` **aborta a execução inteira de propósito** — continuar sem conseguir registrar onde parou causa perda ou reprocessamento.
+`NSUState` é um `map[cnpj]nsu` em JSON. Gravado **a cada lote** com escrita atômica (temp + rename). Se a gravação falhar, `ErrStateNotSaved` **aborta a execução inteira de propósito** — continuar sem conseguir registrar onde parou causa perda ou reprocessamento.
 
 ### Saída em disco
 
@@ -73,24 +75,24 @@ Três consequências que orientam o código todo:
 
 O mês vem de `<dhProc>` (emissão, não competência), formato `AAAA-MM` para ordenar no Explorer. Sem `dhProc`, cai em `sem-data`. Eventos levam o NSU no nome porque **chegam com a mesma `ChaveAcesso` da nota**.
 
-⚠️ A regra que monta `<NOME>_<raiz8>` existe em **dois lugares**: `downloadCNPJ`, que grava de fato, e `downloadRoot`, que só calcula para informar em `Resultado.Pasta` — é o caminho que a tela mostra ao auxiliar. Mudou uma, mude a outra.
+⚠️ A regra que monta `<NOME>_<raiz8>` existe em **dois lugares**: `downloadCNPJ`, que grava de fato, e `downloadRoot`, que só calcula para informar em `Result.Folder` — é o caminho que a tela mostra ao auxiliar. Mudou uma, mude a outra.
 
 ### Configuração
 
-`config.json` (fora do versionamento). Campos vazios acionam os padrões em `aplicarPadroes`, que também **cria as pastas**: `~/Documents/NFSE` e `~/Documents/NFSE/_controle/nsu.json`. É o que permite rodar numa máquina nova sem configurar nada.
+`config.json` (fora do versionamento). Campos vazios acionam os padrões em `applyDefaults`, que também **cria as pastas**: `~/Documents/NFSE` e `~/Documents/NFSE/_controle/nsu.json`. É o que permite rodar numa máquina nova sem configurar nada.
 
-O `clientes.exemplo.csv` (versionado) documenta o formato da lista: separador `;`, a primeira linha é cabeçalho e é ignorada, CNPJ na coluna 2 e nome na coluna 3. Empresas com a mesma raiz de 8 dígitos viram **um grupo só**, e o nome do grupo é o da matriz (`0001`) — `limparNome` corta os sufixos `" - MATRIZ"` e `" - FILIAL"` do cadastro.
+O `clientes.exemplo.csv` (versionado) documenta o formato da lista: separador `;`, a primeira linha é cabeçalho e é ignorada, CNPJ na coluna 2 e nome na coluna 3. Empresas com a mesma raiz de 8 dígitos viram **um grupo só**, e o nome do grupo é o da matriz (`0001`) — `cleanName` corta os sufixos `" - MATRIZ"` e `" - FILIAL"` do cadastro.
 
 ## Restrições que já custaram caro
 
 1. **`estadoPath` nunca no Google Drive.** O drive virtual não substitui arquivo existente; o `os.Rename` falha e derruba o programa (acontecia por volta do lote 11). Estado é arquivo de trabalho — disco local.
 2. **Gravar XML direto no Drive não é confiável.** Já produziu `0 falhas` com nada chegando ao destino: o Windows aceita a gravação e o cliente do Google falha depois, em silêncio, desviando arquivos para `Meu Drive` e criando pastas duplicadas de mesmo nome. Provado em 13/08/2026: mesmo código, destino local, 12.476/12.476 e uma pasta só.
-3. **A pausa entre lotes é 1s — medida, não chutada.** Constante `pausaEntreLotes` no `download.go`. Com 500ms o ADN devolve 429 na segunda requisição; com 1s rodam 13 lotes seguidos sem nenhum. A busca em si leva 0,2–0,4s, então o gargalo é a pausa e não a rede. Descer abaixo de 1s economiza poucos segundos e um único 429 custa 5s de backoff (que dobra, até 6 tentativas) — não compensa. O valor anterior era 2s, escolhido com folga logo depois de o 500ms falhar, e nunca tinha sido medido.
+3. **A pausa entre lotes é 1s — medida, não chutada.** Constante `pauseBetweenBatches` no `download.go`. Com 500ms o ADN devolve 429 na segunda requisição; com 1s rodam 13 lotes seguidos sem nenhum. A busca em si leva 0,2–0,4s, então o gargalo é a pausa e não a rede. Descer abaixo de 1s economiza poucos segundos e um único 429 custa 5s de backoff (que dobra, até 6 tentativas) — não compensa. O valor anterior era 2s, escolhido com folga logo depois de o 500ms falhar, e nunca tinha sido medido.
 4. **Lote = 50, fixo pelo servidor.** O parâmetro `lote` do swagger é **booleano** (lote sim/não), não tamanho. Não existe página de 100.
-5. **`MkdirAll` uma vez por pasta, não por arquivo.** Já foram 12.456 chamadas numa execução. `gravarComTentativas` recebe um `map[string]bool`; o `delete` após falha força recriar (o Drive some com pastas).
+5. **`MkdirAll` uma vez por pasta, não por arquivo.** Já foram 12.456 chamadas numa execução. `writeWithRetries` recebe um `map[string]bool`; o `delete` após falha força recriar (o Drive some com pastas).
 6. **`savedCount` conta gravações, não arquivos.** Documentos com a mesma `ChaveAcesso` sobrescrevem — 53 salvos podem virar 51 arquivos. Qualquer conferência que compare os dois números direto dá alarme falso.
-7. **Na dúvida entre repetir e pular um NSU, repita.** Arquivo é sobrescrito; nota pulada some para sempre. O ponteiro só avança quando o lote inteiro gravou (`falhasDeGravacao == 0`).
-8. **Pendência não é erro.** `downloadRoot` devolve `err == nil` **com uma `Pendencia` dentro** quando o certificado está vencido, não abre ou não existe. É de propósito: no `--todas`, uma empresa quebrada não pode parar as outras 236. Quem consome o resultado precisa checar `len(resultado.Pendencias) > 0`, não só o `err`. Isso já causou bug — a tela mostrava pílula **verde** "Nada novo" para certificado vencido.
+7. **Na dúvida entre repetir e pular um NSU, repita.** Arquivo é sobrescrito; nota pulada some para sempre. O ponteiro só avança quando o lote inteiro gravou (`writeFailures == 0`).
+8. **Pendência não é erro.** `downloadRoot` devolve `err == nil` **com um `Issue` dentro** quando o certificado está vencido, não abre ou não existe. É de propósito: no `--todas`, uma empresa quebrada não pode parar as outras 236. Quem consome o resultado precisa checar `len(result.Issues) > 0`, não só o `err`. Isso já causou bug — a tela mostrava pílula **verde** "Nada novo" para certificado vencido.
 
 ## Dado de cliente nunca entra no repositório
 

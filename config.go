@@ -8,11 +8,11 @@ import (
 )
 
 type Config struct {
-	CertificadosDir string `json:"certificadosDir"`
-	ConvertidosDir  string `json:"convertidosDir"`
+	CertificatesDir string `json:"certificadosDir"`
+	ConvertedDir    string `json:"convertidosDir"`
 	XMLBaseDir      string `json:"xmlBaseDir"`
-	EstadoPath      string `json:"estadoPath"`
-	ClientesCSV     string `json:"clientesCSV"`
+	StatePath       string `json:"estadoPath"`
+	ClientsCSV      string `json:"clientesCSV"`
 }
 
 func loadConfig(path string) (Config, error) {
@@ -29,8 +29,8 @@ func loadConfig(path string) (Config, error) {
 	return config, nil
 }
 
-func aplicarPadroes(config Config) (Config, error) {
-	if config.XMLBaseDir == "" || config.EstadoPath == "" {
+func applyDefaults(config Config) (Config, error) {
+	if config.XMLBaseDir == "" || config.StatePath == "" {
 		home, err := os.UserHomeDir()
 		if err != nil {
 			return config, fmt.Errorf("não consegui descobrir a pasta do usuário: %w", err)
@@ -41,8 +41,8 @@ func aplicarPadroes(config Config) (Config, error) {
 		if config.XMLBaseDir == "" {
 			config.XMLBaseDir = base
 		}
-		if config.EstadoPath == "" {
-			config.EstadoPath = filepath.Join(base, "_controle", "nsu.json")
+		if config.StatePath == "" {
+			config.StatePath = filepath.Join(base, "_controle", "nsu.json")
 		}
 	}
 
@@ -50,9 +50,9 @@ func aplicarPadroes(config Config) (Config, error) {
 		return config, fmt.Errorf("não consegui criar a pasta %s: %w", config.XMLBaseDir, err)
 	}
 
-	pastaControle := filepath.Dir(config.EstadoPath)
-	if err := os.MkdirAll(pastaControle, 0o755); err != nil {
-		return config, fmt.Errorf("não consegui criar a pasta de controle %s: %w", pastaControle, err)
+	controlDir := filepath.Dir(config.StatePath)
+	if err := os.MkdirAll(controlDir, 0o755); err != nil {
+		return config, fmt.Errorf("não consegui criar a pasta de controle %s: %w", controlDir, err)
 	}
 
 	return config, nil

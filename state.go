@@ -7,8 +7,8 @@ import (
 	"os"
 )
 
-// ErrEstadoNaoSalvo sinaliza que o arquivo de controle não pôde ser gravado
-var ErrEstadoNaoSalvo = errors.New("Não foi possível gravar o arquivo de controle")
+// ErrStateNotSaved sinaliza que o arquivo de controle não pôde ser gravado
+var ErrStateNotSaved = errors.New("Não foi possível gravar o arquivo de controle")
 
 // NSUState guarda o último NSU lido de cada CNPJ
 type NSUState map[string]int64

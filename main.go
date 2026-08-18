@@ -16,66 +16,66 @@ func main() {
 		log.Fatal("Erro ao carregar a configuração: ", err)
 	}
 
-	config, err = aplicarPadroes(config)
+	config, err = applyDefaults(config)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	if len(os.Args) == 1 || os.Args[1] == "--tela" {
-		if err := servirWeb(config, "localhost:8080"); err != nil {
+		if err := serveWeb(config, "localhost:8080"); err != nil {
 			log.Fatal(err)
 		}
 		return
 	}
 
 	if len(os.Args) > 1 && os.Args[1] == "--scan" {
-		scanCertificates(config.CertificadosDir)
+		scanCertificates(config.CertificatesDir)
 		return
 	}
 
 	if len(os.Args) > 1 && os.Args[1] == "--cert" {
-		raiz := os.Args[2]
-		caminho, senha, err := findCertificate(config.CertificadosDir, raiz)
+		root := os.Args[2]
+		path, password, err := findCertificate(config.CertificatesDir, root)
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Println("Certificado:", caminho)
-		fmt.Println("Senha......:", senha)
+		fmt.Println("Certificado:", path)
+		fmt.Println("Senha......:", password)
 		return
 	}
 
 	if len(os.Args) > 2 && os.Args[1] == "--resetar" {
-		alvo := os.Args[2]
+		target := os.Args[2]
 
-		state, err := loadState(config.EstadoPath)
+		state, err := loadState(config.StatePath)
 		if err != nil {
 			log.Fatal("Erro ao ler o arquivo de controle: ", err)
 		}
 
-		apagados := 0
+		deleted := 0
 		for cnpj, nsu := range state {
-			if strings.HasPrefix(cnpj, alvo) {
+			if strings.HasPrefix(cnpj, target) {
 				fmt.Printf(" %s estava no NSU %d\n", cnpj, nsu)
 				delete(state, cnpj)
-				apagados++
+				deleted++
 			}
 		}
 
-		if apagados == 0 {
-			fmt.Printf("Nada encontrado no controle para %s\n", alvo)
+		if deleted == 0 {
+			fmt.Printf("Nada encontrado no controle para %s\n", target)
 			return
 		}
 
-		if err := saveState(config.EstadoPath, state); err != nil {
+		if err := saveState(config.StatePath, state); err != nil {
 			log.Fatal(err)
 		}
 
-		fmt.Printf("\n%d ponteiro(s) apagado(s) - a proxima execucao baixa tudo de novo.\n", apagados)
+		fmt.Printf("\n%d ponteiro(s) apagado(s) - a proxima execucao baixa tudo de novo.\n", deleted)
 		return
 	}
 
 	if len(os.Args) > 1 && os.Args[1] == "--todas" {
-		companies, err := loadCompanies(config.ClientesCSV)
+		companies, err := loadCompanies(config.ClientsCSV)
 		if err != nil {
 			log.Fatal("Erro ao ler o CSV de clientes: ", err)
 		}
@@ -87,21 +87,21 @@ func main() {
 		sort.Strings(roots)
 
 		if len(os.Args) > 2 {
-			limite, err := strconv.Atoi(os.Args[2])
-			if err != nil || limite < 1 {
+			limit, err := strconv.Atoi(os.Args[2])
+			if err != nil || limit < 1 {
 				log.Fatalf("Limite inválido: %q", os.Args[2])
 			}
-			if limite < len(roots) {
-				roots = roots[:limite]
+			if limit < len(roots) {
+				roots = roots[:limit]
 			}
 		}
 
-		state, err := loadState(config.EstadoPath)
+		state, err := loadState(config.StatePath)
 		if err != nil {
 			log.Fatal("Erro ao ler o arquivo de controle: ", err)
 		}
 
-		var geral Resultado
+		var total Result
 
 		for i, root := range roots {
 			if i > 0 {
@@ -110,10 +110,10 @@ func main() {
 
 			fmt.Printf("\n[%d/%d]", i+1, len(roots))
 
-			resultado, err := downloadRoot(config, state, root, companies[root].CNPJs)
-			geral.Salvos += resultado.Salvos
-			geral.Falhas += resultado.Falhas
-			geral.Pendencias = append(geral.Pendencias, resultado.Pendencias...)
+			result, err := downloadRoot(config, state, root, companies[root].CNPJs)
+			total.Saved += result.Saved
+			total.Failed += result.Failed
+			total.Issues = append(total.Issues, result.Issues...)
 
 			if err != nil {
 				log.Printf("PARANDO: %v", err)
@@ -123,12 +123,12 @@ func main() {
 
 		fmt.Printf("\n===== RESUMO =====\n")
 		fmt.Printf("Empresas processadas: %d\n", len(roots))
-		fmt.Printf("Documentos salvos...: %d\n", geral.Salvos)
-		fmt.Printf("Documentos com falha: %d\n", geral.Falhas)
-		fmt.Printf("Empresas com erro...: %d\n", len(geral.Pendencias))
+		fmt.Printf("Documentos salvos...: %d\n", total.Saved)
+		fmt.Printf("Documentos com falha: %d\n", total.Failed)
+		fmt.Printf("Empresas com erro...: %d\n", len(total.Issues))
 
-		for _, p := range geral.Pendencias {
-			fmt.Printf("  [%s] %s %s - %s\n", p.Tipo, p.Raiz, p.Nome, p.Motivo)
+		for _, issue := range total.Issues {
+			fmt.Printf("  [%s] %s %s - %s\n", issue.Kind, issue.Root, issue.Name, issue.Reason)
 		}
 		return
 	}
@@ -140,7 +140,7 @@ func main() {
 		if len(os.Args) > 3 {
 			cnpjs = os.Args[3:]
 		} else {
-			companies, err := loadCompanies(config.ClientesCSV)
+			companies, err := loadCompanies(config.ClientsCSV)
 			if err != nil {
 				log.Fatal("Erro ao ler o CSV de clientes: ", err)
 			}
@@ -152,19 +152,19 @@ func main() {
 			cnpjs = company.CNPJs
 		}
 
-		state, err := loadState(config.EstadoPath)
+		state, err := loadState(config.StatePath)
 		if err != nil {
 			log.Fatal("Erro ao ler o arquivo de controle: ", err)
 		}
 
-		resultado, err := downloadRoot(config, state, root, cnpjs)
+		result, err := downloadRoot(config, state, root, cnpjs)
 		if err != nil {
 			log.Fatalf("Raiz %s: %v", root, err)
 		}
 
-		fmt.Printf("\nTotal da raiz %s: %d salvos, %d falhas\n", root, resultado.Salvos, resultado.Falhas)
-		for _, p := range resultado.Pendencias {
-			fmt.Printf("  PENDENTE [%s] %s\n", p.Tipo, p.Motivo)
+		fmt.Printf("\nTotal da raiz %s: %d salvos, %d falhas\n", root, result.Saved, result.Failed)
+		for _, issue := range result.Issues {
+			fmt.Printf("  PENDENTE [%s] %s\n", issue.Kind, issue.Reason)
 		}
 		return
 	}
@@ -172,7 +172,7 @@ func main() {
 	certPath := os.Args[1]
 	certPassword := os.Args[2]
 
-	clientCertificate, companyCertificate, err := loadCertificate(certPath, certPassword, config.ConvertidosDir)
+	clientCertificate, companyCertificate, err := loadCertificate(certPath, certPassword, config.ConvertedDir)
 	if err != nil {
 		log.Fatal("Erro ao carregar o certificado: ", err)
 	}
@@ -197,7 +197,7 @@ func main() {
 
 	companyName := strings.TrimSpace(commonNameParts[0])
 
-	statePath := config.EstadoPath
+	statePath := config.StatePath
 	state, err := loadState(statePath)
 	if err != nil {
 		log.Fatal("Erro ao ler o arquivo de controle", err)

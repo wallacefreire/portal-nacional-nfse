@@ -77,7 +77,7 @@ func fetchBatch(httpClient *http.Client, nsu int64, cnpjConsulta string) (*Distr
 	}
 
 	if response.StatusCode != http.StatusOK && response.StatusCode != http.StatusNotFound {
-		return nil, fmt.Errorf("servidor respondeu %s: %s", response.Status, resumir(body))
+		return nil, fmt.Errorf("servidor respondeu %s: %s", response.Status, summarize(body))
 	}
 
 	var distribution DistributionResponse
@@ -108,10 +108,10 @@ func unwrapXML(encoded string) ([]byte, error) {
 	return xmlContent, nil
 }
 
-func resumir(dados []byte) string {
-	texto := strings.Join(strings.Fields(string(dados)), " ")
-	if len(texto) > 200 {
-		return texto[:200] + "..."
+func summarize(data []byte) string {
+	text := strings.Join(strings.Fields(string(data)), " ")
+	if len(text) > 200 {
+		return text[:200] + "..."
 	}
-	return texto
+	return text
 }

@@ -16,25 +16,25 @@ import (
 	"software.sslmate.com/src/go-pkcs12"
 )
 
-// ErrSemCertificado sinaliza que não existe .pfx para aquela raiz
-var ErrSemCertificado = errors.New("Nenhum certificado encontrado")
+// ErrNoCertificate sinaliza que não existe .pfx para aquela raiz
+var ErrNoCertificate = errors.New("Nenhum certificado encontrado")
 
-// ErrSenhaNoNome sinaliza que o .pfx existe mas a senha não está no nome do arquivo
-var ErrSenhaNoNome = errors.New("Senha não encontrada no nome do certificado")
+// ErrNoPasswordInName sinaliza que o .pfx existe mas a senha não está no nome do arquivo
+var ErrNoPasswordInName = errors.New("Senha não encontrada no nome do certificado")
 
-// ErrCertificadoInvalido sinaliza que o .pfx existe mas não abriu
-var ErrCertificadoInvalido = errors.New("Não foi possível abrir o certificado")
+// ErrInvalidCertificate sinaliza que o .pfx existe mas não abriu
+var ErrInvalidCertificate = errors.New("Não foi possível abrir o certificado")
 
 func clientForRoot(config Config, root string) (*http.Client, *x509.Certificate, error) {
-	certPath, certPassword, err := findCertificate(config.CertificadosDir, root)
+	certPath, certPassword, err := findCertificate(config.CertificatesDir, root)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	clientCert, companyCert, err := loadCertificate(certPath, certPassword, config.ConvertidosDir)
+	clientCert, companyCert, err := loadCertificate(certPath, certPassword, config.ConvertedDir)
 	if err != nil {
 		return nil, nil, fmt.Errorf("%w da raiz %s (confira a senha no nome do arquivo)",
-			ErrCertificadoInvalido, root)
+			ErrInvalidCertificate, root)
 	}
 
 	return newHTTPClient(clientCert), companyCert, nil
@@ -57,12 +57,12 @@ func findCertificate(certDir, root string) (string, string, error) {
 
 		password, err := extractPasswordFromFilename(entry.Name())
 		if err != nil {
-			return "", "", fmt.Errorf("%w para a raiz %s", ErrSenhaNoNome, root)
+			return "", "", fmt.Errorf("%w para a raiz %s", ErrNoPasswordInName, root)
 		}
 
 		return filepath.Join(certDir, entry.Name()), password, nil
 	}
-	return "", "", fmt.Errorf("%w para a raiz %s", ErrSemCertificado, root)
+	return "", "", fmt.Errorf("%w para a raiz %s", ErrNoCertificate, root)
 }
 
 func loadCertificate(originalPath, password, cacheDir string) (tls.Certificate, *x509.Certificate, error) {

@@ -40,7 +40,7 @@ func loadCompanies(path string) (map[string]*Company, error) {
 		}
 
 		cnpj := onlyDigits(row[1])
-		name := limparNome(row[2])
+		name := cleanName(row[2])
 
 		if len(cnpj) != 14 {
 			continue
@@ -69,14 +69,14 @@ func onlyDigits(s string) string {
 	return b.String()
 }
 
-func limparNome(nome string) string {
-	nome = strings.TrimSpace(nome)
+func cleanName(name string) string {
+	name = strings.TrimSpace(name)
 
-	for _, sufixo := range []string{" - MATRIZ", " - FILIAL"} {
-		if posicao := strings.Index(strings.ToUpper(nome), sufixo); posicao >= 0 {
-			return strings.TrimSpace(nome[:posicao])
+	for _, suffix := range []string{" - MATRIZ", " - FILIAL"} {
+		if position := strings.Index(strings.ToUpper(name), suffix); position >= 0 {
+			return strings.TrimSpace(name[:position])
 		}
 	}
 
-	return nome
+	return name
 }

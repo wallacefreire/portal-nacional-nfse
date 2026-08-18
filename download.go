@@ -11,59 +11,59 @@ import (
 	"time"
 )
 
-const pausaEntreLotes = 1 * time.Second
+const pauseBetweenBatches = 1 * time.Second
 
-type Pendencia struct {
-	Raiz   string
+type Issue struct {
+	Root   string
 	CNPJ   string
-	Nome   string
-	Tipo   string
-	Motivo string
+	Name   string
+	Kind   string
+	Reason string
 }
 
-type Resultado struct {
-	Salvos     int
-	Falhas     int
-	Pasta      string
-	Pendencias []Pendencia
+type Result struct {
+	Saved  int
+	Failed int
+	Folder string
+	Issues []Issue
 }
 
 const (
-	TipoSemCertificado      = "Sem certificado"
-	TipoVencido             = "Certificado Vencido"
-	TipoFalhaConsulta       = "Falha na Consulta"
-	TipoSenhaNoNome         = "Senha não cadastrada"
-	TipoCertificadoInvalido = "Certificado não abre"
+	IssueNoCertificate  = "Sem certificado"
+	IssueExpired        = "Certificado Vencido"
+	IssueQueryFailed    = "Falha na Consulta"
+	IssueNoPassword     = "Senha não cadastrada"
+	IssueBadCertificate = "Certificado não abre"
 )
 
-func downloadRoot(config Config, state NSUState, root string, cnpjs []string) (Resultado, error) {
-	var resultado Resultado
+func downloadRoot(config Config, state NSUState, root string, cnpjs []string) (Result, error) {
+	var result Result
 
 	httpClient, companyCert, err := clientForRoot(config, root)
 	if err != nil {
-		tipo := TipoFalhaConsulta
+		kind := IssueQueryFailed
 		switch {
-		case errors.Is(err, ErrSemCertificado):
-			tipo = TipoSemCertificado
-		case errors.Is(err, ErrSenhaNoNome):
-			tipo = TipoSenhaNoNome
-		case errors.Is(err, ErrCertificadoInvalido):
-			tipo = TipoCertificadoInvalido
+		case errors.Is(err, ErrNoCertificate):
+			kind = IssueNoCertificate
+		case errors.Is(err, ErrNoPasswordInName):
+			kind = IssueNoPassword
+		case errors.Is(err, ErrInvalidCertificate):
+			kind = IssueBadCertificate
 		}
 
-		resultado.Pendencias = append(resultado.Pendencias, Pendencia{
-			Raiz:   root,
-			Tipo:   tipo,
-			Motivo: err.Error(),
+		result.Issues = append(result.Issues, Issue{
+			Root:   root,
+			Kind:   kind,
+			Reason: err.Error(),
 		})
-		return resultado, nil
+		return result, nil
 	}
 
 	commonNameParts := strings.Split(companyCert.Subject.CommonName, ":")
 	companyName := strings.TrimSpace(commonNameParts[0])
 
 	safeName := strings.NewReplacer("/", "-", `\`, "-", ":", "-").Replace(companyName)
-	resultado.Pasta = filepath.Join(config.XMLBaseDir, safeName+"_"+root)
+	result.Folder = filepath.Join(config.XMLBaseDir, safeName+"_"+root)
 
 	fmt.Printf("\n=== %s (raiz %s) - validade %s ===\n",
 		companyName, root, companyCert.NotAfter.Format("02/01/2006"))
@@ -71,43 +71,43 @@ func downloadRoot(config Config, state NSUState, root string, cnpjs []string) (R
 	if time.Now().After(companyCert.NotAfter) {
 		fmt.Println("ATENÇÃO: certificado vencido - pulando empresa")
 
-		resultado.Pendencias = append(resultado.Pendencias, Pendencia{
-			Raiz:   root,
-			Nome:   companyName,
-			Tipo:   TipoVencido,
-			Motivo: "vencido em " + companyCert.NotAfter.Format("02/01/2006"),
+		result.Issues = append(result.Issues, Issue{
+			Root:   root,
+			Name:   companyName,
+			Kind:   IssueExpired,
+			Reason: "vencido em " + companyCert.NotAfter.Format("02/01/2006"),
 		})
-		return resultado, nil
+		return result, nil
 	}
 
 	for i, cnpj := range cnpjs {
 		if i > 0 {
-			time.Sleep(pausaEntreLotes)
+			time.Sleep(pauseBetweenBatches)
 		}
 
 		fmt.Println("Consultando:", cnpj)
 
 		saved, failed, err := downloadCNPJ(httpClient, config, state, companyName, cnpj)
-		resultado.Salvos += saved
-		resultado.Falhas += failed
+		result.Saved += saved
+		result.Failed += failed
 
 		if err != nil {
-			if errors.Is(err, ErrEstadoNaoSalvo) {
-				return resultado, err
+			if errors.Is(err, ErrStateNotSaved) {
+				return result, err
 			}
 
 			log.Printf("raiz %s, CNPJ %s: %v", root, cnpj, err)
-			resultado.Pendencias = append(resultado.Pendencias, Pendencia{
-				Raiz:   root,
+			result.Issues = append(result.Issues, Issue{
+				Root:   root,
 				CNPJ:   cnpj,
-				Nome:   companyName,
-				Tipo:   TipoFalhaConsulta,
-				Motivo: err.Error(),
+				Name:   companyName,
+				Kind:   IssueQueryFailed,
+				Reason: err.Error(),
 			})
 		}
 	}
 
-	return resultado, nil
+	return result, nil
 }
 
 func downloadCNPJ(httpClient *http.Client, config Config, state NSUState, companyName, targetCNPJ string) (int, int, error) {
@@ -125,7 +125,7 @@ func downloadCNPJ(httpClient *http.Client, config Config, state NSUState, compan
 	failedCount := 0
 	batchCount := 0
 	currentNSU := state[targetCNPJ]
-	pastasCriadas := map[string]bool{}
+	createdDirs := map[string]bool{}
 
 	if currentNSU > 0 {
 		fmt.Printf("Retomando do NSU %d\n", currentNSU)
@@ -134,9 +134,9 @@ func downloadCNPJ(httpClient *http.Client, config Config, state NSUState, compan
 	}
 
 	for {
-		inicioBusca := time.Now()
+		fetchStart := time.Now()
 		distribution, err := fetchBatchWithRetry(httpClient, currentNSU, cnpjConsulta)
-		duracaoBusca := time.Since(inicioBusca)
+		fetchDuration := time.Since(fetchStart)
 		if err != nil {
 			return savedCount, failedCount, fmt.Errorf("Erro ao buscar lote no NSU %d: %w", currentNSU, err)
 		}
@@ -153,10 +153,10 @@ func downloadCNPJ(httpClient *http.Client, config Config, state NSUState, compan
 
 		batchCount++
 		fmt.Printf("Lote %d: %d documentos a partir do NSU %d (busca %.1fs)\n",
-			batchCount, len(distribution.LoteDFe), currentNSU, duracaoBusca.Seconds())
+			batchCount, len(distribution.LoteDFe), currentNSU, fetchDuration.Seconds())
 
 		var highestNSU int64
-		falhasDeGravacao := 0
+		writeFailures := 0
 
 		for _, document := range distribution.LoteDFe {
 			if document.NSU > highestNSU {
@@ -185,10 +185,10 @@ func downloadCNPJ(httpClient *http.Client, config Config, state NSUState, compan
 			}
 
 			fullPath := filepath.Join(outputDir, filename)
-			if err := gravarComTentativas(pastasCriadas, outputDir, fullPath, xmlContent); err != nil {
+			if err := writeWithRetries(createdDirs, outputDir, fullPath, xmlContent); err != nil {
 				log.Printf("Erro ao gravar NSU %d: %v", document.NSU, err)
 				failedCount++
-				falhasDeGravacao++
+				writeFailures++
 				continue
 			}
 
@@ -196,10 +196,10 @@ func downloadCNPJ(httpClient *http.Client, config Config, state NSUState, compan
 
 		}
 
-		if falhasDeGravacao > 0 {
+		if writeFailures > 0 {
 			return savedCount, failedCount, fmt.Errorf(
 				"%d de %d documentos do lote não foram gravados - ponteiro mantido em %d",
-				falhasDeGravacao, len(distribution.LoteDFe), currentNSU)
+				writeFailures, len(distribution.LoteDFe), currentNSU)
 		}
 
 		if highestNSU <= currentNSU {
@@ -210,8 +210,8 @@ func downloadCNPJ(httpClient *http.Client, config Config, state NSUState, compan
 		currentNSU = highestNSU
 		state[targetCNPJ] = currentNSU
 
-		if err := saveState(config.EstadoPath, state); err != nil {
-			return savedCount, failedCount, fmt.Errorf("%w (NSU %d): %v", ErrEstadoNaoSalvo, currentNSU, err)
+		if err := saveState(config.StatePath, state); err != nil {
+			return savedCount, failedCount, fmt.Errorf("%w (NSU %d): %v", ErrStateNotSaved, currentNSU, err)
 		}
 
 		time.Sleep(2 * time.Second)
@@ -224,44 +224,44 @@ func downloadCNPJ(httpClient *http.Client, config Config, state NSUState, compan
 }
 
 func extractIssueDate(xmlContent []byte) string {
-	texto := string(xmlContent)
+	text := string(xmlContent)
 
-	inicio := strings.Index(texto, "<dhProc>")
-	if inicio < 0 {
+	start := strings.Index(text, "<dhProc>")
+	if start < 0 {
 		return "sem-data"
 	}
-	inicio += len("<dhProc>")
+	start += len("<dhProc>")
 
-	if len(texto) < inicio+7 {
+	if len(text) < start+7 {
 		return "sem-data"
 	}
 
-	ano := texto[inicio : inicio+4]
-	mes := texto[inicio+5 : inicio+7]
+	year := text[start : start+4]
+	month := text[start+5 : start+7]
 
-	return ano + "-" + mes
+	return year + "-" + month
 }
 
-func gravarComTentativas(pastasCriadas map[string]bool, dir, caminho string, conteudo []byte) error {
+func writeWithRetries(createdDirs map[string]bool, dir, path string, content []byte) error {
 	var err error
 
-	for tentativa := 1; tentativa <= 3; tentativa++ {
-		if tentativa > 1 {
-			time.Sleep(time.Duration(tentativa-1) * time.Second)
+	for attempt := 1; attempt <= 3; attempt++ {
+		if attempt > 1 {
+			time.Sleep(time.Duration(attempt-1) * time.Second)
 		}
 
-		if !pastasCriadas[dir] {
+		if !createdDirs[dir] {
 			if err = os.MkdirAll(dir, 0o755); err != nil {
 				continue
 			}
-			pastasCriadas[dir] = true
+			createdDirs[dir] = true
 		}
 
-		if err = os.WriteFile(caminho, conteudo, 0o644); err == nil {
+		if err = os.WriteFile(path, content, 0o644); err == nil {
 			return nil
 		}
 
-		delete(pastasCriadas, dir)
+		delete(createdDirs, dir)
 	}
 
 	return err
