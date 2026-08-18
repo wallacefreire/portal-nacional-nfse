@@ -11,19 +11,19 @@ import (
 )
 
 func main() {
-	config, err := loadConfig("config.json")
+	config, err := loadConfig(findConfig())
 	if err != nil {
-		log.Fatal("Erro ao carregar a configuração: ", err)
+		fatal("Erro ao carregar a configuração: ", err)
 	}
 
 	config, err = applyDefaults(config)
 	if err != nil {
-		log.Fatal(err)
+		fatal(err)
 	}
 
 	if len(os.Args) == 1 || os.Args[1] == "--tela" {
 		if err := serveWeb(config, "localhost:8080"); err != nil {
-			log.Fatal(err)
+			fatal(err)
 		}
 		return
 	}
@@ -206,4 +206,11 @@ func main() {
 	if _, _, err := downloadCNPJ(httpClient, config, state, companyName, targetCNPJ); err != nil {
 		log.Fatal("Erro ao baixar: ", err)
 	}
+}
+
+func fatal(message ...any) {
+	log.Println(message...)
+	fmt.Print("\nPressione Enter para fechar...")
+	fmt.Scanln()
+	os.Exit(1)
 }

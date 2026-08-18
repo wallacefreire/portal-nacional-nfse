@@ -57,3 +57,14 @@ func applyDefaults(config Config) (Config, error) {
 
 	return config, nil
 }
+
+func findConfig() string {
+	exe, err := os.Executable()
+	if err == nil {
+		beside := filepath.Join(filepath.Dir(exe), "config.json")
+		if _, err := os.Stat(beside); err == nil {
+			return beside
+		}
+	}
+	return "config.json"
+}
