@@ -42,6 +42,8 @@ O download não pode responder na mesma requisição: a primeira carga de uma em
 
 ⚠️ `hidden` não funciona em elemento com `display` declarado. Toda vez que o JS usar `hidden`, precisa da regra `[hidden] { display: none; }` junto — já pegou o `li` da lista e o botão de limpar a busca.
 
+`servirWeb` separa `net.Listen` de `http.Serve` de propósito: a porta precisa estar aceitando **antes** de o navegador ser chamado, senão a página abre em "não foi possível conectar". Abrir o navegador (`abrirNavegador`, via `rundll32`) é conveniência — se falhar, só registra no log e o servidor continua.
+
 ### O modelo NSU — o conceito que explica o resto
 
 O ADN não aceita consulta por data. É uma **caixa postal numerada**: cada documento destinado a um CNPJ ganha um NSU sequencial, e a única operação é *"me dê o que chegou depois do NSU X"* (`GET /contribuintes/DFe/{NSU}?cnpjConsulta=`).
@@ -77,6 +79,8 @@ O mês vem de `<dhProc>` (emissão, não competência), formato `AAAA-MM` para o
 
 `config.json` (fora do versionamento). Campos vazios acionam os padrões em `aplicarPadroes`, que também **cria as pastas**: `~/Documents/NFSE` e `~/Documents/NFSE/_controle/nsu.json`. É o que permite rodar numa máquina nova sem configurar nada.
 
+O `clientes.exemplo.csv` (versionado) documenta o formato da lista: separador `;`, a primeira linha é cabeçalho e é ignorada, CNPJ na coluna 2 e nome na coluna 3. Empresas com a mesma raiz de 8 dígitos viram **um grupo só**, e o nome do grupo é o da matriz (`0001`) — `limparNome` corta os sufixos `" - MATRIZ"` e `" - FILIAL"` do cadastro.
+
 ## Restrições que já custaram caro
 
 1. **`estadoPath` nunca no Google Drive.** O drive virtual não substitui arquivo existente; o `os.Rename` falha e derruba o programa (acontecia por volta do lote 11). Estado é arquivo de trabalho — disco local.
@@ -87,6 +91,12 @@ O mês vem de `<dhProc>` (emissão, não competência), formato `AAAA-MM` para o
 6. **`savedCount` conta gravações, não arquivos.** Documentos com a mesma `ChaveAcesso` sobrescrevem — 53 salvos podem virar 51 arquivos. Qualquer conferência que compare os dois números direto dá alarme falso.
 7. **Na dúvida entre repetir e pular um NSU, repita.** Arquivo é sobrescrito; nota pulada some para sempre. O ponteiro só avança quando o lote inteiro gravou (`falhasDeGravacao == 0`).
 8. **Pendência não é erro.** `downloadRoot` devolve `err == nil` **com uma `Pendencia` dentro** quando o certificado está vencido, não abre ou não existe. É de propósito: no `--todas`, uma empresa quebrada não pode parar as outras 236. Quem consome o resultado precisa checar `len(resultado.Pendencias) > 0`, não só o `err`. Isso já causou bug — a tela mostrava pílula **verde** "Nada novo" para certificado vencido.
+
+## Dado de cliente nunca entra no repositório
+
+O repositório é **público**, e isso já vazou uma vez: os casos do `main_test.go` usavam razão social, CNPJ e senha de certificados reais, incluindo o nome completo de uma pessoa física.
+
+Ao escrever teste, exemplo, README ou tirar print da tela, use dados inventados. Para fotografar a interface, aponte o `clientesCSV` para o `clientes.exemplo.csv` antes, e devolva depois.
 
 ## README
 

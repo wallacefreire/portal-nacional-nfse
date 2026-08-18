@@ -21,7 +21,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if len(os.Args) > 1 && os.Args[1] == "--tela" {
+	if len(os.Args) == 1 || os.Args[1] == "--tela" {
 		if err := servirWeb(config, "localhost:8080"); err != nil {
 			log.Fatal(err)
 		}

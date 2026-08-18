@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"html/template"
 	"log"
+	"net"
 	"net/http"
+	"os/exec"
 	"sort"
 )
 
@@ -398,13 +400,26 @@ func servirWeb(config Config, endereco string) error {
 		w.Write(logoPNG)
 	})
 
-	log.Println("Abra no navegador: http://" + endereco)
-	return http.ListenAndServe(endereco, nil)
+	listener, err := net.Listen("tcp", endereco)
+	if err != nil {
+		return err
+	}
+
+	log.Println("servidor no ar em http://" + endereco + " - Ctrl+C para encerrar")
+	abrirNavegador("http://" + endereco)
+
+	return http.Serve(listener, nil)
 }
 
 func responderJSON(w http.ResponseWriter, dados any) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(dados); err != nil {
 		log.Println("erro ao responder JSON:", err)
+	}
+}
+
+func abrirNavegador(url string) {
+	if err := exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start(); err != nil {
+		log.Println("Não consegui abrir o navegador. Acesse " + url + " manualmente.")
 	}
 }
