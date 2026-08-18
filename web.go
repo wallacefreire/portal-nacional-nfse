@@ -11,10 +11,10 @@ import (
 	"sort"
 )
 
-//go:embed logo-branco.png
+//go:embed assets/logo-branco.png
 var logoPNG []byte
 
-//go:embed fundo.png
+//go:embed assets/fundo.png
 var fundoPNG []byte
 
 var page = template.Must(template.New("page").Parse(`<!doctype html>
@@ -303,6 +303,18 @@ function mostrar(acao, texto, situacao) {
   acao.className = situacao ? 'acao ' + situacao : 'acao';
 }
 
+function numero(valor) {
+  return valor.toLocaleString('pt-BR');
+}
+
+function andamento(tarefa) {
+  if (tarefa.salvos === 0) return 'Baixando...';
+
+  let texto = numero(tarefa.salvos) + ' notas';
+  if (tarefa.etapas > 1) texto += ' - ' + tarefa.etapa + '/' + tarefa.etapas;
+  return texto;
+}
+
 function acompanhar(li) {
   const acao = li.querySelector('.acao');
 
@@ -311,7 +323,10 @@ function acompanhar(li) {
     if (!resposta.ok) return;
 
     const tarefa = await resposta.json();
-    if (tarefa.situacao === 'rodando') return;
+    if (tarefa.situacao === 'rodando') {
+      mostrar(acao, andamento(tarefa), 'rodando');
+      return;
+    }
 
     clearInterval(relogio);
     li.dataset.ocupado = 'nao';
@@ -322,7 +337,7 @@ function acompanhar(li) {
       return;
     }
 
-    mostrar(acao, tarefa.salvos > 0 ? tarefa.salvos + ' notas' : 'Nada novo', 'pronto');
+    mostrar(acao, tarefa.salvos > 0 ? numero(tarefa.salvos) + ' notas' : 'Nada novo', 'pronto');
 
   }, 2000);
 }
@@ -421,5 +436,11 @@ func respondJSON(w http.ResponseWriter, data any) {
 func openBrowser(url string) {
 	if err := exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start(); err != nil {
 		log.Println("Não consegui abrir o navegador. Acesse " + url + " manualmente.")
+	}
+}
+
+func openFolder(path string) {
+	if err := exec.Command("explorer", path).Start(); err != nil {
+		log.Println("Impedido de abrir a pasta:", path)
 	}
 }

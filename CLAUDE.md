@@ -32,6 +32,8 @@ O programa decide o que baixar **só pelo ponteiro, nunca olhando o disco** — 
 
 Package `main` único, arquivos divididos por assunto: `adn.go` (HTTP e API), `certificate.go` (.pfx e mTLS), `clients.go` (CSV), `config.go`, `download.go` (orquestração e gravação), `state.go` (ponteiro), `main.go` (modos de linha de comando), `web.go` (a página e as rotas), `tasks.go` (downloads em segundo plano).
 
+**Um package só é de propósito** — pasta em Go existe para criar package novo, e 1.500 linhas não pedem isso. Só os arquivos que não são código moram em pasta: `assets/` (as imagens embutidas via `//go:embed assets/...`) e `docs/` (`swagger.json` e o print da tela usado no README). Os `.exemplo` ficam na raiz porque documentam formato.
+
 ### A interface web
 
 Alvo final do projeto: os auxiliares contábeis operam por tela, não por linha de comando. `serveWeb` lê o CSV **uma vez na subida**, ordena e guarda numa closure — a busca das ~237 empresas acontece no navegador, não no servidor.

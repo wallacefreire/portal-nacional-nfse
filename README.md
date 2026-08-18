@@ -16,7 +16,7 @@ Este programa cobre essa parte: busca os XMLs direto da API oficial e deixa os a
 
 ## A interface
 
-![Tela de download de NFS-e](docs-tela.png)
+![Tela de download de NFS-e](docs/tela.png)
 
 Quem opera o programa no dia a dia são auxiliares contábeis, então linha de comando não serve. O comando `--tela` sobe um servidor local e a pessoa trabalha pelo navegador: busca a empresa pelo nome ou CNPJ, clica, e vê quantas notas vieram e em que pasta foram salvas.
 

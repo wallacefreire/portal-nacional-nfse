@@ -36,7 +36,7 @@ const (
 	IssueBadCertificate = "Certificado não abre"
 )
 
-func downloadRoot(config Config, state NSUState, root string, cnpjs []string) (Result, error) {
+func downloadRoot(config Config, state NSUState, root string, cnpjs []string, task *Task) (Result, error) {
 	var result Result
 
 	httpClient, companyCert, err := clientForRoot(config, root)
@@ -86,8 +86,10 @@ func downloadRoot(config Config, state NSUState, root string, cnpjs []string) (R
 		}
 
 		fmt.Println("Consultando:", cnpj)
+		task.startStep(i+1, len(cnpjs))
 
-		saved, failed, err := downloadCNPJ(httpClient, config, state, companyName, cnpj)
+		saved, failed, err := downloadCNPJ(httpClient, config, state, companyName, cnpj, task)
+
 		result.Saved += saved
 		result.Failed += failed
 
@@ -110,7 +112,7 @@ func downloadRoot(config Config, state NSUState, root string, cnpjs []string) (R
 	return result, nil
 }
 
-func downloadCNPJ(httpClient *http.Client, config Config, state NSUState, companyName, targetCNPJ string) (int, int, error) {
+func downloadCNPJ(httpClient *http.Client, config Config, state NSUState, companyName, targetCNPJ string, task *Task) (int, int, error) {
 	safeName := strings.NewReplacer("/", "-", `\`, "-", ":", "-").Replace(companyName)
 
 	root := targetCNPJ
@@ -154,6 +156,8 @@ func downloadCNPJ(httpClient *http.Client, config Config, state NSUState, compan
 		batchCount++
 		fmt.Printf("Lote %d: %d documentos a partir do NSU %d (busca %.1fs)\n",
 			batchCount, len(distribution.LoteDFe), currentNSU, fetchDuration.Seconds())
+
+		savedBefore, failedBefore := savedCount, failedCount
 
 		var highestNSU int64
 		writeFailures := 0
@@ -213,6 +217,8 @@ func downloadCNPJ(httpClient *http.Client, config Config, state NSUState, compan
 		if err := saveState(config.StatePath, state); err != nil {
 			return savedCount, failedCount, fmt.Errorf("%w (NSU %d): %v", ErrStateNotSaved, currentNSU, err)
 		}
+
+		task.progress(savedCount-savedBefore, failedCount-failedBefore)
 
 		time.Sleep(2 * time.Second)
 	}

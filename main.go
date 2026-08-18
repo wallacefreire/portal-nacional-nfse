@@ -110,7 +110,7 @@ func main() {
 
 			fmt.Printf("\n[%d/%d]", i+1, len(roots))
 
-			result, err := downloadRoot(config, state, root, companies[root].CNPJs)
+			result, err := downloadRoot(config, state, root, companies[root].CNPJs, nil)
 			total.Saved += result.Saved
 			total.Failed += result.Failed
 			total.Issues = append(total.Issues, result.Issues...)
@@ -157,7 +157,7 @@ func main() {
 			log.Fatal("Erro ao ler o arquivo de controle: ", err)
 		}
 
-		result, err := downloadRoot(config, state, root, cnpjs)
+		result, err := downloadRoot(config, state, root, cnpjs, nil)
 		if err != nil {
 			log.Fatalf("Raiz %s: %v", root, err)
 		}
@@ -203,7 +203,7 @@ func main() {
 		log.Fatal("Erro ao ler o arquivo de controle", err)
 	}
 
-	if _, _, err := downloadCNPJ(httpClient, config, state, companyName, targetCNPJ); err != nil {
+	if _, _, err := downloadCNPJ(httpClient, config, state, companyName, targetCNPJ, nil); err != nil {
 		log.Fatal("Erro ao baixar: ", err)
 	}
 }
