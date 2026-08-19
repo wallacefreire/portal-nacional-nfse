@@ -22,6 +22,8 @@ Quem opera o programa no dia a dia são auxiliares contábeis, então linha de c
 
 A lista é montada a partir de um CSV de clientes, agrupada pela raiz do CNPJ. Assim um clique baixa a matriz e todas as filiais da mesma empresa.
 
+Na máquina de quem opera, o programa é um executável único e sem argumento nenhum: duplo clique abre a tela no navegador, sem janela de terminal. Ele procura o `config.json` ao lado do próprio executável e escreve o log num arquivo na mesma pasta, porque sem console não haveria onde ler mensagem alguma. Erro na subida aparece numa caixa do Windows.
+
 ---
 
 ## Como funciona
@@ -48,6 +50,10 @@ A primeira execução de uma empresa traz o histórico inteiro. As seguintes tra
 **Baixar filiais com o certificado da matriz.** O e-CNPJ da matriz vale para a pessoa jurídica inteira. A API tem um parâmetro opcional chamado `cnpjConsulta`, e com ele dá para pedir as notas de uma filial estando autenticado como matriz. Cada estabelecimento tem numeração de NSU própria, então cada um precisa do seu ponteiro.
 
 **O download não pode responder na mesma requisição.** A primeira carga de uma empresa grande leva vários minutos, e o navegador desiste antes disso. Resolvi disparando uma goroutine e respondendo assim que o pedido chega. A página consulta o estado a cada dois segundos até terminar. Esse estado fica num mapa protegido por mutex, e a função de leitura devolve uma cópia, para não entregar o mesmo ponteiro que a goroutine está escrevendo.
+
+**Uma instância só, e o segundo clique volta para ela.** Sem console e sem janela, o programa não tem como ser fechado por quem usa: ele sobe e fica no ar, como um serviço. O efeito disso era que o segundo duplo clique do dia encontrava a porta ocupada e morria numa caixa de erro. Agora, quando o `Listen` falha, o programa abre uma conexão de teste no mesmo endereço: se alguém responde, ele manda o navegador abrir a tela da instância viva e encerra em silêncio. Preferi perguntar por conexão a interpretar o código do erro, porque no Windows volta `WSAEADDRINUSE`, que não casa com `syscall.EADDRINUSE` num `errors.Is` — sobraria comparar texto de mensagem, que quebra sem avisar.
+
+**A letra do drive não é confiável.** Os certificados e o CSV ficam num drive compartilhado, e a letra que ele recebe muda de máquina para máquina, às vezes até na mesma máquina depois de uma reconexão. Como o `config.json` é copiado igual para todas, um caminho fixo quebraria a cada instalação. Se o caminho configurado não existe, o programa refaz o teste trocando a letra por cada uma de C a Z e fica com a primeira que existir. Se nenhuma servir, devolve o caminho original, para a mensagem de erro continuar mostrando o que a pessoa escreveu.
 
 **A pausa entre requisições.** O ADN responde HTTP 429 quando recebe requisições muito seguidas. Na primeira versão deixei dois segundos de pausa entre lotes, por precaução. Depois coloquei um cronômetro em cada busca e vi que ela leva de 0,2 a 0,4 segundo, ou seja, quase todo o tempo de execução era espera. Testei com um segundo e rodaram 13 lotes seguidos sem nenhum 429, o que cortou o tempo pela metade. Não desci mais porque cada 429 custa cinco segundos de backoff, e o ganho ficaria pequeno demais para o risco.
 
@@ -101,6 +107,14 @@ go run . --resetar <raiz8|cnpj14>        # apaga o ponteiro e força rebaixar tu
 go run . <arquivo.pfx> <senha> [cnpj14]  # modo direto, sem CSV
 ```
 
+O executável que vai para as máquinas dos auxiliares é gerado com:
+
+```bash
+go build -ldflags="-H=windowsgui" -o portalnacional.exe .
+```
+
+A flag remove a saída padrão, então esse binário serve só para a tela: os modos de linha de comando acima não teriam onde imprimir e precisam do `go run`, que compila sem ela.
+
 O `--resetar` existe porque o programa decide o que baixar olhando só o ponteiro, nunca o disco. Se alguém apagar os XMLs sem apagar o ponteiro, o programa entende que já entregou aquelas notas e não busca de novo.
 
 ---
@@ -128,6 +142,7 @@ O mês vem da data de emissão lida do próprio XML. Usei o formato `AAAA-MM` pa
 - Só um download por vez. O arquivo de ponteiro é único, e duas execuções ao mesmo tempo sobrescreveriam o registro uma da outra.
 - A lista de filiais vem do CSV. O programa não descobre estabelecimentos sozinho.
 - A reconversão de certificados BER depende do Windows.
+- O programa não se encerra pela tela. Ele sobe e fica no ar, e fechar a aba do navegador não desliga o servidor.
 
 ---
 

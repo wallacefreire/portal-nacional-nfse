@@ -238,6 +238,14 @@ var page = template.Must(template.New("page").Parse(`<!doctype html>
     color: #a52020;
     border-color: #f2c4c4;
   }
+
+  .acao.pendencia,
+  li:hover .acao.pendencia {
+    background: #fff6e5;
+    color: #8a5a00;
+    border-color: #f0d7a4;
+  }
+
 </style>
 </head>
 <body>
@@ -334,6 +342,12 @@ function acompanhar(li) {
 
     clearInterval(relogio);
     li.dataset.ocupado = 'nao';
+
+    if (tarefa.situacao === 'pendente') {
+      mostrar(acao, tarefa.pendencia, 'pendencia');
+      li.title = tarefa.mensagem;
+      return;
+    }
 
     if (tarefa.situacao === 'erro') {
       mostrar(acao, 'Falhou', 'erro');

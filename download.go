@@ -30,8 +30,8 @@ type Result struct {
 
 const (
 	IssueNoCertificate  = "Sem certificado"
-	IssueExpired        = "Certificado Vencido"
-	IssueQueryFailed    = "Falha na Consulta"
+	IssueExpired        = "Certificado vencido"
+	IssueQueryFailed    = "Falha na consulta"
 	IssueNoPassword     = "Senha não cadastrada"
 	IssueBadCertificate = "Certificado não abre"
 )

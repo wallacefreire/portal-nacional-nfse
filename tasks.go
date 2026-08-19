@@ -15,6 +15,7 @@ type Task struct {
 	Steps   int    `json:"etapas"`
 	Message string `json:"mensagem"`
 	Folder  string `json:"pasta"`
+	Issue   string `json:"pendencia"`
 }
 
 var (
@@ -59,10 +60,9 @@ func runDownload(config Config, company *Company, task *Task) {
 
 	if len(result.Issues) > 0 {
 		issue := result.Issues[0]
-		finish(task, "erro", result.Saved, result.Failed, "",
-			issue.Kind+": "+issue.Reason)
+		task.setIssue(issue.Kind)
+		finish(task, "pendente", result.Saved, result.Failed, "", issue.Reason)
 		return
-
 	}
 
 	finish(task, "pronto", result.Saved, result.Failed, result.Folder, "")
@@ -105,6 +105,12 @@ func (task *Task) startStep(step, steps int) {
 
 	task.Step = step
 	task.Steps = steps
+}
+
+func (task *Task) setIssue(kind string) {
+	tasksMutex.Lock()
+	defer tasksMutex.Unlock()
+	task.Issue = kind
 }
 
 func readTask(root string) *Task {
