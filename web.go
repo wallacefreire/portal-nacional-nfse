@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os/exec"
 	"sort"
+	"time"
 )
 
 //go:embed assets/logo-branco.png
@@ -418,13 +419,23 @@ func serveWeb(config Config, address string) error {
 		w.Write(logoPNG)
 	})
 
+	url := "http://" + address
+
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
-		return err
+		running, dialErr := net.DialTimeout("tcp", address, time.Second)
+		if dialErr != nil {
+			return err
+		}
+		running.Close()
+
+		log.Println("Já existe uma instância no ar - abrindo " + url)
+		openBrowser(url)
+		return nil
 	}
 
-	log.Println("servidor no ar em http://" + address + " - Ctrl+C para encerrar")
-	openBrowser("http://" + address)
+	log.Println("servidor no ar em " + url + " - Ctrl+C para encerrar")
+	openBrowser(url)
 
 	return http.Serve(listener, nil)
 }
