@@ -46,6 +46,10 @@ func applyDefaults(config Config) (Config, error) {
 		}
 	}
 
+	config.CertificatesDir = resolveDriveLetter(config.CertificatesDir)
+	config.ConvertedDir = resolveDriveLetter(config.ConvertedDir)
+	config.ClientsCSV = resolveDriveLetter(config.ClientsCSV)
+
 	if err := os.MkdirAll(config.XMLBaseDir, 0o755); err != nil {
 		return config, fmt.Errorf("não consegui criar a pasta %s: %w", config.XMLBaseDir, err)
 	}
@@ -72,4 +76,23 @@ func findConfig() string {
 		return beside
 	}
 	return "config.json"
+}
+
+func resolveDriveLetter(path string) string {
+	if _, err := os.Stat(path); err == nil {
+		return path
+	}
+
+	if len(path) < 3 || path[1] != ':' {
+		return path
+	}
+
+	for letter := 'C'; letter <= 'Z'; letter++ {
+		candidate := string(letter) + path[1:]
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+
+	return path
 }
