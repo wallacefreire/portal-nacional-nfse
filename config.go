@@ -13,6 +13,7 @@ type Config struct {
 	XMLBaseDir      string `json:"xmlBaseDir"`
 	StatePath       string `json:"estadoPath"`
 	ClientsCSV      string `json:"clientesCSV"`
+	Address         string `json:"endereco"`
 }
 
 func loadConfig(path string) (Config, error) {
@@ -44,6 +45,10 @@ func applyDefaults(config Config) (Config, error) {
 		if config.StatePath == "" {
 			config.StatePath = filepath.Join(base, "_controle", "nsu.json")
 		}
+	}
+
+	if config.Address == "" {
+		config.Address = "localhost:8080"
 	}
 
 	config.CertificatesDir = resolveDriveLetter(config.CertificatesDir)

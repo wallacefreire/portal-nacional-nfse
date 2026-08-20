@@ -21,8 +21,16 @@ func (writer fileAndScreen) Write(line []byte) (int, error) {
 	return writer.file.Write(line)
 }
 
+const maxLogSize = 5 << 20
+
 func startLog() {
-	file, err := os.OpenFile(besideExe("portalnacional.log"),
+	path := besideExe("portalnacional.log")
+
+	if info, err := os.Stat(path); err == nil && info.Size() > maxLogSize {
+		os.Rename(path, path+".old")
+	}
+
+	file, err := os.OpenFile(path,
 		os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
 		return
@@ -45,7 +53,7 @@ func main() {
 	}
 
 	if len(os.Args) == 1 || os.Args[1] == "--tela" {
-		if err := serveWeb(config, "localhost:8080"); err != nil {
+		if err := serveWeb(config, config.Address); err != nil {
 			fatal(err)
 		}
 		return

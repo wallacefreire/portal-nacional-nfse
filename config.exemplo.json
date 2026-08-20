@@ -3,5 +3,6 @@
   "convertidosDir": "C:\\caminho\\para\\convertidos",
   "xmlBaseDir": "C:\\caminho\\para\\xmls-baixados",
   "estadoPath": "C:\\caminho\\para\\nsu.json",
-  "clientesCSV": "C:\\caminho\\para\\Clientes.csv"
+  "clientesCSV": "C:\\caminho\\para\\Clientes.csv",
+  "endereco": ""
 }
