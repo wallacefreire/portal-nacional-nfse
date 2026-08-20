@@ -1,6 +1,11 @@
 package main
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+)
 
 func TestOnlyDigits(t *testing.T) {
 	got := onlyDigits("11.111.111/0001-91")
@@ -58,5 +63,78 @@ func TestPasswordBadCases(t *testing.T) {
 		if err == nil {
 			t.Errorf("%q devia dar erro, mas passou", name)
 		}
+	}
+}
+
+func TestLoadCompanies(t *testing.T) {
+	companies, err := loadCompanies("clientes.exemplo.csv")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(companies) != 8 {
+		t.Errorf("deu %d raízes, esperava 8", len(companies))
+	}
+
+	group := companies["33333333"]
+	if group == nil {
+		t.Fatal("não achou a raiz 33333333")
+	}
+
+	if len(group.CNPJs) != 3 {
+		t.Errorf("a raiz ficou com %d estabelecimentos, esperava 3", len(group.CNPJs))
+	}
+
+	if group.Name != "TRANSPORTES FICTICIOS LTDA" {
+		t.Errorf("nome do grupo deu %q, esperava sem o sufixo de filial", group.Name)
+	}
+}
+
+func TestLoadCompaniesSkipsBadRows(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "clientes.csv")
+	content := "id;cnpj;nome\n1;11.111.111/0001-91;EMPRESA VALIDA LTDA\n2;123;CNPJ CURTO LTDA\n3\n"
+
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	companies, err := loadCompanies(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(companies) != 1 {
+		t.Errorf("deu %d raízes, esperava 1 - as duas linhas ruins deviam ser ignoradas", len(companies))
+	}
+}
+
+func TestFindCertificatePrefersNewest(t *testing.T) {
+	dir := t.TempDir()
+
+	older := filepath.Join(dir, "EMPRESA EXEMPLO LTDA -- 11111111000191 -- senha antiga.pfx")
+	newer := filepath.Join(dir, "EMPRESA EXEMPLO LTDA -- 11111111000191 -- senha nova.pfx")
+
+	for _, path := range []string{older, newer} {
+		if err := os.WriteFile(path, []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	past := time.Now().Add(-48 * time.Hour)
+	if err := os.Chtimes(older, past, past); err != nil {
+		t.Fatal(err)
+	}
+
+	path, password, err := findCertificate(dir, "11111111")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if filepath.Base(path) != filepath.Base(newer) {
+		t.Errorf("escolheu %q, esperava o mais recente", filepath.Base(path))
+	}
+
+	if password != "nova" {
+		t.Errorf("senha deu %q, esperava %q", password, "nova")
 	}
 }
