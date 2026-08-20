@@ -17,6 +17,9 @@ import (
 // ErrRateLimited sinaliza que o servidor pedir pra ir mais devagar
 var ErrRateLimited = errors.New("limite de requisições atingido")
 
+// ErrUnavailable sinaliza falha passageira: rede fora ou erro 5xx do servidor
+var ErrUnavailable = errors.New("serviço indisponível")
+
 // DistributionResponse é a resposta inteira de GET /DFe/{NSU}
 type DistributionResponse struct {
 	StatusProcessamento string           `json:"statusProcessamento"`
@@ -42,11 +45,11 @@ func fetchBatchWithRetry(httpClient *http.Client, nsu int64, cnpjConsulta string
 			return distribution, nil
 		}
 
-		if !errors.Is(err, ErrRateLimited) {
+		if !errors.Is(err, ErrRateLimited) && !errors.Is(err, ErrUnavailable) {
 			return nil, err
 		}
 
-		log.Printf("429 no NSU %d - aguardando %s (tentativa %d/6)", nsu, waitTime, attempt)
+		log.Printf("NSU %d: %v - tentando de novo em %s (tentativa %d/6)", nsu, err, waitTime, attempt)
 		time.Sleep(waitTime)
 		waitTime *= 2
 	}
@@ -63,7 +66,7 @@ func fetchBatch(httpClient *http.Client, nsu int64, cnpjConsulta string) (*Distr
 	response, err := httpClient.Get(url)
 
 	if err != nil {
-		return nil, fmt.Errorf("chamando a API no NSU %d: %w", nsu, err)
+		return nil, fmt.Errorf("chamando a API no NSU %d: %w: %w", nsu, ErrUnavailable, err)
 	}
 	defer response.Body.Close()
 
@@ -74,6 +77,10 @@ func fetchBatch(httpClient *http.Client, nsu int64, cnpjConsulta string) (*Distr
 
 	if response.StatusCode == http.StatusTooManyRequests {
 		return nil, ErrRateLimited
+	}
+
+	if response.StatusCode >= 500 {
+		return nil, fmt.Errorf("%w: servidor respondeu %s", ErrUnavailable, response.Status)
 	}
 
 	if response.StatusCode != http.StatusOK && response.StatusCode != http.StatusNotFound {
