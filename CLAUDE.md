@@ -36,9 +36,9 @@ O programa decide o que baixar **só pelo ponteiro, nunca olhando o disco** — 
 
 ## Arquitetura
 
-Package `main` único, arquivos divididos por assunto: `adn.go` (HTTP e API), `certificate.go` (.pfx e mTLS), `clients.go` (CSV), `config.go`, `download.go` (orquestração e gravação), `state.go` (ponteiro), `main.go` (modos de linha de comando), `web.go` (a página e as rotas), `tasks.go` (downloads em segundo plano).
+Package `main` único, arquivos divididos por assunto: `adn.go` (HTTP e API), `certificate.go` (.pfx e mTLS), `clients.go` (CSV), `config.go`, `download.go` (orquestração e gravação), `state.go` (ponteiro), `main.go` (modos de linha de comando), `web.go` (as rotas e o servidor), `page.html` (a página, embutida no binário via `//go:embed`), `tasks.go` (downloads em segundo plano).
 
-**Um package só é de propósito** — pasta em Go existe para criar package novo, e 1.500 linhas não pedem isso. Só os arquivos que não são código moram em pasta: `assets/` (as imagens embutidas via `//go:embed assets/...`) e `docs/` (`swagger.json` e o print da tela usado no README). Os `.exemplo` ficam na raiz porque documentam formato.
+**Um package só é de propósito** — pasta em Go existe para criar package novo, e 1.500 linhas não pedem isso. Só os arquivos que não são Go moram em pasta: `assets/` (as imagens embutidas via `//go:embed assets/...`) e `docs/` (`swagger.json` e o print da tela usado no README). Os `.exemplo` ficam na raiz porque documentam formato.
 
 ### A interface web
 
@@ -48,11 +48,23 @@ O download não pode responder na mesma requisição: a primeira carga de uma em
 
 **Um download por vez, de propósito** (`startDownload` recusa se houver outro rodando): o `nsu.json` é um arquivo só, e dois downloads simultâneos sobrescreveriam o ponteiro um do outro. Impedir é mais barato que administrar.
 
-⚠️ O HTML/CSS/JS vive dentro de uma **string crua do Go delimitada por crase** — não use crase no JavaScript (nada de template literal), ela encerra a string. Monte URL com `+`.
+O HTML/CSS/JS vive no `page.html`, embutido no binário na compilação (`//go:embed page.html`). Até 20/08/2026 ele morava numa string crua do Go, o que proibia crase no JavaScript; essa restrição acabou — template literal pode.
 
 ⚠️ `hidden` não funciona em elemento com `display` declarado. Toda vez que o JS usar `hidden`, precisa da regra `[hidden] { display: none; }` junto — já pegou o `li` da lista e o botão de limpar a busca.
 
 `serveWeb` separa `net.Listen` de `http.Serve` de propósito: a porta precisa estar aceitando **antes** de o navegador ser chamado, senão a página abre em "não foi possível conectar". Abrir o navegador (`openBrowser`, via `rundll32`) é conveniência — se falhar, só registra no log e o servidor continua.
+
+**Instância única.** Se o `Listen` falha, o programa abre um `net.DialTimeout` no mesmo endereço para saber se **já tem instância no ar**: se alguém responde, ele manda o navegador abrir a tela viva e devolve `nil` — encerra em silêncio, sem caixa de erro. ⚠️ Não decida isso pelo código do erro: no Windows volta `WSAEADDRINUSE` (10048), que **não casa** com `syscall.EADDRINUSE` num `errors.Is`, e sobraria comparar texto de mensagem, que quebra calado. Efeito colateral conhecido: se **outro** programa estiver na 8080, a tela que abre é a dele.
+
+### O executável que o auxiliar recebe
+
+Duplo clique sem argumento cai na tela. Como o binário de release é linkado com `-H=windowsgui`, **não existe console**, e isso muda três coisas:
+
+- **O log vai para arquivo.** `startLog` abre `portalnacional.log` ao lado do executável (`besideExe`) e escreve nele **e** na saída padrão (`fileAndScreen`). É a única testemunha do que aconteceu na máquina do auxiliar. ⚠️ Sob `go run .`, `os.Executable()` aponta para a pasta temporária do Go, que é apagada no fim — nessa hora o log é o terminal, não o arquivo.
+- **Erro de subida vira caixa do Windows.** `fatal` registra no log e chama `showError` (`MessageBoxW` via `syscall`), senão a falha seria invisível.
+- **O `config.json` é procurado ao lado do exe** (`findConfig`), com queda para o caminho relativo, que é o que mantém o `go run .` funcionando no repositório.
+
+**O programa não tem como ser encerrado, e isso é decisão.** Ele sobe e fica no ar, como um serviço — fechar a aba não desliga nada, porque navegador e servidor são processos separados. Botão "Encerrar" na página e heartbeat foram propostos e recusados: não é o padrão e custa complexidade. Desligar é tarefa de quem administra a máquina.
 
 ### O modelo NSU — o conceito que explica o resto
 
@@ -68,6 +80,7 @@ Três consequências que orientam o código todo:
 
 - A **senha está no nome do arquivo** `.pfx`, em padrões inconsistentes (`--`, `-`, "senha"/"Senha"/"SENHA"). `extractPasswordFromFilename` cobre os casos reais; `main_test.go` tem exemplos verdadeiros — acrescente lá antes de mexer na função.
 - Certificados ICP-Brasil vêm em **BER** e o Go só lê **DER**. `loadCertificate` tenta ler direto, cai para um cache em `convertidosDir` e, em último caso, reconverte chamando **`pwsh`** (PowerShell 7 — `powershell.exe` 5.1 não serve). Conversão em Go puro foi tentada e falhou; não repita.
+- Quando existe **mais de um `.pfx` para a mesma raiz** (renovação: o antigo fica na pasta ao lado do novo), `findCertificate` fica com o de **modificação mais recente** e registra no log quantos achou. Antes ele pegava o primeiro em ordem alfabética, o que podia escolher o vencido e a tela acusar "Certificado vencido" com um certificado válido do lado.
 - Nunca coloque a senha em mensagem de erro.
 
 ### Estado
@@ -89,7 +102,11 @@ O mês vem de `<dhProc>` (emissão, não competência), formato `AAAA-MM` para o
 
 `config.json` (fora do versionamento). Campos vazios acionam os padrões em `applyDefaults`, que também **cria as pastas**: `~/Documents/NFSE` e `~/Documents/NFSE/_controle/nsu.json`. É o que permite rodar numa máquina nova sem configurar nada.
 
+`applyDefaults` também passa `certificadosDir`, `convertidosDir` e `clientesCSV` por `resolveDriveLetter`: se o caminho não existe e parece `X:\...`, ele refaz o teste trocando a letra por cada uma de C a Z e fica com a primeira que existir. Existe porque a letra de drive de nuvem/rede **muda de máquina para máquina** (e às vezes na mesma máquina, depois de reconectar), e o mesmo `config.json` é copiado para todas. Não achando nada, devolve o caminho original — assim a mensagem de erro continua mostrando o que a pessoa escreveu.
+
 O `clientes.exemplo.csv` (versionado) documenta o formato da lista: separador `;`, a primeira linha é cabeçalho e é ignorada, CNPJ na coluna 2 e nome na coluna 3. Empresas com a mesma raiz de 8 dígitos viram **um grupo só**, e o nome do grupo é o da matriz (`0001`) — `cleanName` corta os sufixos `" - MATRIZ"` e `" - FILIAL"` do cadastro.
+
+⚠️ `TestLoadCompanies` lê esse arquivo de verdade e confere números fixos (10 linhas → 8 grupos, 3 estabelecimentos na raiz `33333333`). Mexeu no exemplo, ajuste o teste.
 
 ## Restrições que já custaram caro
 

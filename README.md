@@ -85,11 +85,12 @@ cp config.exemplo.json config.json
   "convertidosDir":  "C:\\caminho\\para\\convertidos",
   "clientesCSV":     "C:\\caminho\\para\\clientes.csv",
   "xmlBaseDir":      "",
-  "estadoPath":      ""
+  "estadoPath":      "",
+  "endereco":       ""
 }
 ```
 
-Os campos deixados vazios assumem valores padrão e criam as pastas sozinhos: `~/Documents/NFSE` para os XMLs e `~/Documents/NFSE/_controle/nsu.json` para o ponteiro. Isso permite rodar numa máquina nova sem configurar nada.
+Os campos deixados vazios assumem valores padrão e criam as pastas sozinhos: `~/Documents/NFSE` para os XMLs, `~/Documents/NFSE/_controle/nsu.json` para o ponteiro e `localhost:8080` para a interface. Isso permite rodar numa máquina nova sem configurar nada.
 
 O `config.json` não vai para o controle de versão, porque contém caminhos internos. O arquivo `clientes.exemplo.csv` mostra o formato esperado da lista de empresas.
 
