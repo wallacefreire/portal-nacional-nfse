@@ -15,9 +15,6 @@ import (
 //go:embed assets/logo-branco.png
 var logoPNG []byte
 
-//go:embed assets/fundo.png
-var fundoPNG []byte
-
 //go:embed page.html
 var pageHTML string
 
