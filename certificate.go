@@ -17,13 +17,13 @@ import (
 )
 
 // ErrNoCertificate sinaliza que não existe .pfx para aquela raiz
-var ErrNoCertificate = errors.New("Nenhum certificado encontrado")
+var ErrNoCertificate = errors.New("nenhum certificado encontrado")
 
 // ErrNoPasswordInName sinaliza que o .pfx existe mas a senha não está no nome do arquivo
-var ErrNoPasswordInName = errors.New("Senha não encontrada no nome do certificado")
+var ErrNoPasswordInName = errors.New("senha não encontrada no nome do certificado")
 
 // ErrInvalidCertificate sinaliza que o .pfx existe mas não abriu
-var ErrInvalidCertificate = errors.New("Não foi possível abrir o certificado")
+var ErrInvalidCertificate = errors.New("não foi possível abrir o certificado")
 
 func clientForRoot(config Config, root string) (*http.Client, *x509.Certificate, error) {
 	certPath, certPassword, err := findCertificate(config.CertificatesDir, root)
@@ -43,8 +43,13 @@ func clientForRoot(config Config, root string) (*http.Client, *x509.Certificate,
 func findCertificate(certDir, root string) (string, string, error) {
 	entries, err := os.ReadDir(certDir)
 	if err != nil {
-		return "", "", fmt.Errorf("Erro ao ler a pasta de certificados: %w", err)
+		return "", "", fmt.Errorf("erro ao ler a pasta de certificados: %w", err)
 	}
+
+	matches := 0
+	chosen := ""
+	chosenPassword := ""
+	var chosenTime time.Time
 
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.EqualFold(filepath.Ext(entry.Name()), ".pfx") {
@@ -55,14 +60,36 @@ func findCertificate(certDir, root string) (string, string, error) {
 			continue
 		}
 
+		matches++
+
 		password, err := extractPasswordFromFilename(entry.Name())
 		if err != nil {
-			return "", "", fmt.Errorf("%w para a raiz %s", ErrNoPasswordInName, root)
+			continue
 		}
 
-		return filepath.Join(certDir, entry.Name()), password, nil
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+
+		if chosen == "" || info.ModTime().After(chosenTime) {
+			chosen, chosenPassword, chosenTime = entry.Name(), password, info.ModTime()
+		}
 	}
-	return "", "", fmt.Errorf("%w para a raiz %s", ErrNoCertificate, root)
+
+	if matches == 0 {
+		return "", "", fmt.Errorf("%w para a raiz %s", ErrNoCertificate, root)
+	}
+
+	if chosen == "" {
+		return "", "", fmt.Errorf("%w para a raiz %s", ErrNoPasswordInName, root)
+	}
+
+	if matches > 1 {
+		log.Printf("%d certificados para a raiz %s - usando o mais recente (%s)", matches, root, chosen)
+	}
+
+	return filepath.Join(certDir, chosen), chosenPassword, nil
 }
 
 func loadCertificate(originalPath, password, cacheDir string) (tls.Certificate, *x509.Certificate, error) {
@@ -155,7 +182,7 @@ func extractPasswordFromFilename(filename string) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("Nenhuma senha encontrada no nome do arquivo")
+	return "", fmt.Errorf("nenhuma senha encontrada no nome do arquivo")
 }
 
 func newHTTPClient(clientCert tls.Certificate) *http.Client {

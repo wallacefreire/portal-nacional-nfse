@@ -140,7 +140,7 @@ func downloadCNPJ(httpClient *http.Client, config Config, state NSUState, compan
 		distribution, err := fetchBatchWithRetry(httpClient, currentNSU, cnpjConsulta)
 		fetchDuration := time.Since(fetchStart)
 		if err != nil {
-			return savedCount, failedCount, fmt.Errorf("Erro ao buscar lote no NSU %d: %w", currentNSU, err)
+			return savedCount, failedCount, fmt.Errorf("erro ao buscar lote no NSU %d: %w", currentNSU, err)
 		}
 
 		if distribution.StatusProcessamento == "NENHUM_DOCUMENTO_LOCALIZADO" {

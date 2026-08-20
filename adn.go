@@ -63,7 +63,7 @@ func fetchBatch(httpClient *http.Client, nsu int64, cnpjConsulta string) (*Distr
 	response, err := httpClient.Get(url)
 
 	if err != nil {
-		return nil, fmt.Errorf("Chamando a API no NSU %d: %w", nsu, err)
+		return nil, fmt.Errorf("chamando a API no NSU %d: %w", nsu, err)
 	}
 	defer response.Body.Close()
 
