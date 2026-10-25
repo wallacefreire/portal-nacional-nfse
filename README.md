@@ -102,8 +102,8 @@ O `config.json` não vai para o controle de versão, porque contém caminhos int
 go run . --tela                          # interface web em http://localhost:8080
 go run . --empresa <raiz8> [cnpj14...]   # uma empresa; sem CNPJ, lê os do CSV
 go run . --todas [limite]                # todas as empresas do CSV
-go run . --scan                          # lista os .pfx e a senha extraída de cada nome
-go run . --cert <raiz8>                  # mostra caminho e senha de uma raiz
+go run . --scan                          # lista os certificados encontrados
+go run . --cert <raiz8>                  # mostra o certificado de uma raiz
 go run . --resetar <raiz8|cnpj14>        # apaga o ponteiro e força rebaixar tudo
 go run . <arquivo.pfx> <senha> [cnpj14]  # modo direto, sem CSV
 ```

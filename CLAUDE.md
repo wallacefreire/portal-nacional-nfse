@@ -18,8 +18,8 @@ go build -ldflags="-H=windowsgui" -o portalnacional.exe .
 
 go run .                                # sem argumento = a tela (é onde o duplo clique cai)
 go run . --tela                         # idem, explícito
-go run . --scan                         # lista os .pfx e a senha extraída de cada nome
-go run . --cert <raiz8>                 # mostra caminho e senha de uma raiz
+go run . --scan                         # lista os certificados encontrados
+go run . --cert <raiz8>                 # mostra o certificado de uma raiz
 go run . --empresa <raiz8> [cnpj14...]  # baixa uma empresa; sem cnpj, lê os do CSV
 go run . --todas [limite]               # todas as empresas do CSV; limite corta a lista
 go run . --resetar <raiz8|cnpj14>       # apaga o ponteiro; a próxima execução rebaixa tudo
@@ -42,7 +42,7 @@ Package `main` único, arquivos divididos por assunto: `adn.go` (HTTP e API), `c
 
 ### A interface web
 
-Alvo final do projeto: os auxiliares contábeis operam por tela, não por linha de comando. `serveWeb` lê o CSV **uma vez na subida**, ordena e guarda numa closure — a busca das ~237 empresas acontece no navegador, não no servidor.
+Alvo final do projeto: os auxiliares contábeis operam por tela, não por linha de comando. `serveWeb` lê o CSV **uma vez na subida**, ordena e guarda numa closure — a busca das empresas acontece no navegador, não no servidor.
 
 O download não pode responder na mesma requisição: a primeira carga de uma empresa leva minutos e o navegador desiste antes. Então `/baixar` dispara uma **goroutine** e responde na hora; a página pergunta `/status` a cada 2s. O estado fica num `map[raiz]*Task` protegido por mutex, e `readTask` devolve **cópia**, nunca o ponteiro.
 
@@ -78,7 +78,7 @@ Três consequências que orientam o código todo:
 
 ### Certificados
 
-- A **senha está no nome do arquivo** `.pfx`, em padrões inconsistentes (`--`, `-`, "senha"/"Senha"/"SENHA"). `extractPasswordFromFilename` cobre os casos reais; `main_test.go` tem exemplos verdadeiros — acrescente lá antes de mexer na função.
+- `extractPasswordFromFilename` cobre os formatos de nome de arquivo aceitos; os casos estão em `main_test.go`, com dados inventados — acrescente lá antes de mexer na função.
 - Certificados ICP-Brasil vêm em **BER** e o Go só lê **DER**. `loadCertificate` tenta ler direto, cai para um cache em `convertidosDir` e, em último caso, reconverte chamando **`pwsh`** (PowerShell 7 — `powershell.exe` 5.1 não serve). Conversão em Go puro foi tentada e falhou; não repita.
 - Quando existe **mais de um `.pfx` para a mesma raiz** (renovação: o antigo fica na pasta ao lado do novo), `findCertificate` fica com o de **modificação mais recente** e registra no log quantos achou. Antes ele pegava o primeiro em ordem alfabética, o que podia escolher o vencido e a tela acusar "Certificado vencido" com um certificado válido do lado.
 - Nunca coloque a senha em mensagem de erro.
@@ -121,7 +121,7 @@ O `clientes.exemplo.csv` (versionado) documenta o formato da lista: separador `;
 
 ## Dado de cliente nunca entra no repositório
 
-O repositório é **público**, e isso já vazou uma vez: os casos do `main_test.go` usavam razão social, CNPJ e senha de certificados reais, incluindo o nome completo de uma pessoa física.
+O repositório é **público**. Teste, exemplo, README e print usam só dados inventados: nenhuma razão social, CNPJ, nome de pessoa ou senha real.
 
 Ao escrever teste, exemplo, README ou tirar print da tela, use dados inventados. Para fotografar a interface, aponte o `clientesCSV` para o `clientes.exemplo.csv` antes, e devolva depois.
 
