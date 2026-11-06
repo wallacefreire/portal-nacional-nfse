@@ -134,6 +134,22 @@ func tryLoadPFX(path, password string) (tls.Certificate, *x509.Certificate, erro
 		cert.Certificate = append(cert.Certificate, authority.Raw)
 	}
 
+	// Há .pfx que vêm só com o certificado da empresa, sem as autoridades
+	// intermediárias. Sem elas o Go não consegue casar o certificado com as
+	// autoridades que o ADN aceita, não envia nada e o servidor derruba a
+	// conexão com "tls: handshake failure". Nesse caso, a cadeia é montada
+	// pelo repositório do Windows, que já conhece as autoridades ICP-Brasil.
+	if len(authorities) == 0 {
+		chains, err := leaf.Verify(x509.VerifyOptions{
+			KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
+		})
+		if err == nil && len(chains) > 0 {
+			for _, authority := range chains[0][1:] {
+				cert.Certificate = append(cert.Certificate, authority.Raw)
+			}
+		}
+	}
+
 	return cert, leaf, nil
 }
 
@@ -191,6 +207,14 @@ func newHTTPClient(clientCert tls.Certificate) *http.Client {
 			TLSClientConfig: &tls.Config{
 				Certificates: []tls.Certificate{clientCert},
 				MinVersion:   tls.VersionTLS12,
+
+				// Teto em 1.2 de propósito. O ADN passou a oferecer TLS 1.3 no fim
+				// de agosto de 2026 e, em máquina com antivírus que inspeciona
+				// tráfego, a conexão morre com "tls: bad record MAC" logo na
+				// primeira requisição. Em 1.2 a mesma consulta responde 200, e 1.2
+				// é o mínimo que a documentação da API exige. Se um dia o ADN
+				// passar a exigir 1.3, é só apagar esta linha.
+				MaxVersion: tls.VersionTLS12,
 			},
 		},
 		Timeout: 30 * time.Second,
