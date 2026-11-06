@@ -126,13 +126,16 @@ O `--resetar` existe porque o programa decide o que baixar olhando só o ponteir
 NFSE/
 └── RAZAO SOCIAL_00000000/          ← raiz do CNPJ, agrupa matriz e filiais
     └── 00000000000100/             ← estabelecimento
-        ├── 2026-07/                ← mês de emissão
-        │   └── <chave-de-acesso>.xml
+        ├── 2026-07/                ← mês de competência
+        │   ├── tomadas/
+        │   │   └── <chave-de-acesso>.xml
+        │   └── prestadas/
+        │       └── <chave-de-acesso>.xml
         └── _eventos/
             └── <chave-de-acesso>-<nsu>.xml
 ```
 
-O mês vem da data de emissão lida do próprio XML. Usei o formato `AAAA-MM` para as pastas ficarem em ordem cronológica no explorador de arquivos. Os eventos, como cancelamentos, levam o NSU no nome porque chegam com a mesma chave de acesso da nota que alteram.
+O mês vem da competência lida do próprio XML (`dCompet`), e não da data de processamento, porque é pela competência que as notas são escrituradas. Tomadas e prestadas ficam separadas comparando o CNPJ do prestador, que vem dentro da chave de acesso, com o CNPJ consultado. Usei o formato `AAAA-MM` para as pastas ficarem em ordem cronológica no explorador de arquivos. Os eventos, como cancelamentos, levam o NSU no nome porque chegam com a mesma chave de acesso da nota que alteram.
 
 ---
 

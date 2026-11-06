@@ -7,7 +7,10 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"slices"
 	"sort"
 	"time"
 )
@@ -50,13 +53,49 @@ func serveWeb(config Config, address string) error {
 			return
 		}
 
-		task, err := startDownload(config, company)
+		task, err := startDownload(config, company, r.URL.Query().Get("competencia"))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}
 
 		respondJSON(w, task)
+	})
+
+	http.HandleFunc("/mes", func(w http.ResponseWriter, r *http.Request) {
+		company, companyDir, competence, ok := monthRequest(w, r, companies)
+		if !ok {
+			return
+		}
+
+		respondJSON(w, summarizeMonth(companyDir, company.CNPJs, competence))
+	})
+
+	http.HandleFunc("/abrir", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
+			return
+		}
+
+		company, companyDir, competence, ok := monthRequest(w, r, companies)
+		if !ok {
+			return
+		}
+
+		cnpj := r.URL.Query().Get("cnpj")
+		if !slices.Contains(company.CNPJs, cnpj) {
+			http.Error(w, "CNPJ não pertence à empresa", http.StatusBadRequest)
+			return
+		}
+
+		monthDir := filepath.Join(companyDir, cnpj, competence)
+		if _, err := os.Stat(monthDir); err != nil {
+			http.Error(w, "Nenhuma nota nesse mês", http.StatusNotFound)
+			return
+		}
+
+		openFolder(monthDir)
+		w.WriteHeader(http.StatusNoContent)
 	})
 
 	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
@@ -93,6 +132,29 @@ func serveWeb(config Config, address string) error {
 	openBrowser(url)
 
 	return http.Serve(listener, nil)
+}
+
+func monthRequest(w http.ResponseWriter, r *http.Request, companies map[string]*Company) (*Company, string, string, bool) {
+	root := r.URL.Query().Get("raiz")
+	company := companies[root]
+	if company == nil {
+		http.Error(w, "Empresa não encontrada", http.StatusNotFound)
+		return nil, "", "", false
+	}
+
+	competence := r.URL.Query().Get("competencia")
+	if !validCompetence(competence) {
+		http.Error(w, "Competência inválida", http.StatusBadRequest)
+		return nil, "", "", false
+	}
+
+	task := readTask(root)
+	if task == nil || task.Folder == "" {
+		http.Error(w, "Baixe a empresa primeiro", http.StatusNotFound)
+		return nil, "", "", false
+	}
+
+	return company, task.Folder, competence, true
 }
 
 func respondJSON(w http.ResponseWriter, data any) {

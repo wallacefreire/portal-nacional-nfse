@@ -46,6 +46,8 @@ Alvo final do projeto: os auxiliares contábeis operam por tela, não por linha 
 
 O download não pode responder na mesma requisição: a primeira carga de uma empresa leva minutos e o navegador desiste antes. Então `/baixar` dispara uma **goroutine** e responde na hora; a página pergunta `/status` a cada 2s. O estado fica num `map[raiz]*Task` protegido por mutex, e `readTask` devolve **cópia**, nunca o ponteiro.
 
+**A competência escolhida na tela** (padrão: mês anterior) não muda o que é baixado — o ADN só entrega por NSU, então o download traz tudo o que chegou. Ela só decide qual pasta contar e abrir: `/mes` devolve tomadas e prestadas de cada estabelecimento naquele mês, `/abrir` abre a pasta do mês, e ao fim do download abre sozinha a pasta do mês quando a empresa tem um CNPJ só. As duas rotas usam a pasta guardada na `Task` (o nome vem do certificado, não do CSV), então só respondem depois de um download na sessão. O caminho é sempre montado no servidor, e a competência passa por `validCompetence` — a página nunca manda um caminho para o Explorer abrir.
+
 **Um download por vez, de propósito** (`startDownload` recusa se houver outro rodando): o `nsu.json` é um arquivo só, e dois downloads simultâneos sobrescreveriam o ponteiro um do outro. Impedir é mais barato que administrar.
 
 O HTML/CSS/JS vive no `page.html`, embutido no binário na compilação (`//go:embed page.html`). Até 20/08/2026 ele morava numa string crua do Go, o que proibia crase no JavaScript; essa restrição acabou — template literal pode.
@@ -90,13 +92,18 @@ Três consequências que orientam o código todo:
 ### Saída em disco
 
 ```
-<xmlBaseDir>/<NOME>_<raiz8>/<cnpj14>/<AAAA-MM>/<chave>.xml
+<xmlBaseDir>/<NOME>_<raiz8>/<cnpj14>/<AAAA-MM>/tomadas/<chave>.xml
+<xmlBaseDir>/<NOME>_<raiz8>/<cnpj14>/<AAAA-MM>/prestadas/<chave>.xml
 <xmlBaseDir>/<NOME>_<raiz8>/<cnpj14>/_eventos/<chave>-<nsu>.xml
 ```
 
-O mês vem de `<dhProc>` (emissão, não competência), formato `AAAA-MM` para ordenar no Explorer. Sem `dhProc`, cai em `sem-data`. Eventos levam o NSU no nome porque **chegam com a mesma `ChaveAcesso` da nota**.
+O mês vem de `<dCompet>` (**competência**, não processamento), formato `AAAA-MM` para ordenar no Explorer. Sem `dCompet`, cai em `sem-data`. Até 06/11/2026 vinha de `<dhProc>`: medido em 21.803 notas, 895 (4%) caíam no mês seguinte ao da competência — e é por competência que o Único importa.
 
-⚠️ A regra que monta `<NOME>_<raiz8>` existe em **dois lugares**: `downloadCNPJ`, que grava de fato, e `downloadRoot`, que só calcula para informar em `Result.Folder` — é o caminho que a tela mostra ao auxiliar. Mudou uma, mude a outra.
+`serviceDirection` separa `tomadas` de `prestadas` comparando o CNPJ do prestador (dígitos 10 a 23 da chave) com o CNPJ consultado. Eventos levam o NSU no nome porque **chegam com a mesma `ChaveAcesso` da nota**.
+
+A regra que monta `<NOME>_<raiz8>` mora só em `companyFolder`: `downloadCNPJ` grava nela e `downloadRoot` devolve o mesmo caminho em `Result.Folder`, que é a pasta que a tela abre.
+
+⚠️ Mudar o layout não move o que já está no disco, e o ponteiro não rebaixa sozinho. Para reorganizar, renomeie a pasta `NFSE` inteira (o `nsu.json` mora dentro dela, em `_controle`) e rebaixe — o programa recria tudo.
 
 ### Configuração
 

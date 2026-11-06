@@ -226,6 +226,72 @@
     border-color: #f0d7a4;
   }
 
+  .linha-busca {
+    display: flex;
+    gap: .75rem;
+    align-items: stretch;
+  }
+
+  .linha-busca .campo { flex: 1; }
+
+  .competencia {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    font-size: .85rem;
+    color: #6b7189;
+    white-space: nowrap;
+  }
+
+  #competencia {
+    padding: .7rem .8rem;
+    font: inherit;
+    font-size: .95rem;
+    color: var(--texto);
+    border: 1px solid var(--borda);
+    border-radius: 10px;
+    background: #fff;
+  }
+
+  li { flex-wrap: wrap; }
+
+  .mes {
+    flex-basis: 100%;
+    cursor: default;
+    border-top: 1px dashed var(--borda);
+    padding-top: .7rem;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+  }
+
+  .mes-linha {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .6rem;
+    font-size: .9rem;
+  }
+
+  .mes-linha .resumo { flex: 1; }
+
+  .botao-mes {
+    padding: .35rem .8rem;
+    border-radius: 8px;
+    border: 1px solid var(--azul);
+    background: #fff;
+    color: var(--azul);
+    font: inherit;
+    font-size: .82rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .botao-mes:hover {
+    background: var(--azul);
+    color: #fff;
+  }
+
 </style>
 </head>
 <body>
@@ -238,9 +304,14 @@
 <main>
   <h1>Escolha a empresa</h1>
   <div class="busca-area">
-    <div class="campo">
-      <input id="busca" placeholder="Nome ou CNPJ da empresa" autofocus>
-      <button id="limpar" type="button" aria-label="Limpar busca" hidden>&times;</button>
+    <div class="linha-busca">
+      <div class="campo">
+        <input id="busca" placeholder="Nome ou CNPJ da empresa" autofocus>
+        <button id="limpar" type="button" aria-label="Limpar busca" hidden>&times;</button>
+      </div>
+      <label class="competencia">Competência
+        <input id="competencia" type="month">
+      </label>
     </div>
     <p id="contador"></p>
   </div>
@@ -336,8 +407,99 @@ function acompanhar(li) {
     }
 
     mostrar(acao, tarefa.salvos > 0 ? numero(tarefa.salvos) + ' notas' : 'Nada novo', 'pronto');
+    mostrarMes(li);
 
   }, 2000);
+}
+
+const competencia = document.getElementById('competencia');
+const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho',
+               'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+function mesAnterior() {
+  const data = new Date();
+  data.setDate(1);
+  data.setMonth(data.getMonth() - 1);
+  return data.getFullYear() + '-' + String(data.getMonth() + 1).padStart(2, '0');
+}
+
+function nomeDoMes(valor) {
+  const [ano, mes] = valor.split('-');
+  return meses[Number(mes) - 1] + '/' + ano;
+}
+
+competencia.value = mesAnterior();
+competencia.addEventListener('change', () => {
+  for (const li of itens) {
+    if (li.querySelector('.mes')) mostrarMes(li);
+  }
+});
+
+async function mostrarMes(li) {
+  const mes = competencia.value;
+  let painel = li.querySelector('.mes');
+
+  const resposta = await fetch(`/mes?raiz=${li.dataset.raiz}&competencia=${mes}`);
+  if (!resposta.ok) {
+    if (painel) painel.remove();
+    return;
+  }
+  const pastas = await resposta.json();
+
+  if (!painel) {
+    painel = document.createElement('div');
+    painel.className = 'mes';
+    painel.addEventListener('click', (evento) => evento.stopPropagation());
+    li.append(painel);
+  }
+  painel.replaceChildren(...pastas.map((pasta) => linhaDoMes(li, pasta, mes, pastas.length > 1)));
+}
+
+function linhaDoMes(li, pasta, mes, variosCNPJs) {
+  const linha = document.createElement('div');
+  linha.className = 'mes-linha';
+
+  const resumo = document.createElement('span');
+  resumo.className = 'resumo';
+  resumo.textContent = (variosCNPJs ? pasta.cnpj + ' · ' : '') + nomeDoMes(mes) + ': '
+    + numero(pasta.tomadas) + ' tomadas · ' + numero(pasta.prestadas) + ' prestadas';
+  linha.append(resumo);
+
+  if (pasta.tomadas + pasta.prestadas === 0) return linha;
+
+  const abrir = botaoDoMes('Abrir pasta do mês', () =>
+    fetch(`/abrir?raiz=${li.dataset.raiz}&cnpj=${pasta.cnpj}&competencia=${mes}`, { method: 'POST' }));
+
+  const copiar = botaoDoMes('Copiar caminho', async () => {
+    await copiarTexto(pasta.caminho);
+    copiar.textContent = 'Copiado!';
+    setTimeout(() => { copiar.textContent = 'Copiar caminho'; }, 1500);
+  });
+
+  linha.append(abrir, copiar);
+  return linha;
+}
+
+function botaoDoMes(texto, aoClicar) {
+  const botao = document.createElement('button');
+  botao.type = 'button';
+  botao.className = 'botao-mes';
+  botao.textContent = texto;
+  botao.addEventListener('click', aoClicar);
+  return botao;
+}
+
+async function copiarTexto(texto) {
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(texto);
+    return;
+  }
+  const campo = document.createElement('textarea');
+  campo.value = texto;
+  document.body.append(campo);
+  campo.select();
+  document.execCommand('copy');
+  campo.remove();
 }
 
 for (const li of itens) {
@@ -348,7 +510,7 @@ for (const li of itens) {
     li.dataset.ocupado = 'sim';
     mostrar(acao, 'Iniciando...', 'rodando');
 
-    const resposta = await fetch('/baixar?raiz=' + li.dataset.raiz, { method: 'POST' });
+    const resposta = await fetch(`/baixar?raiz=${li.dataset.raiz}&competencia=${competencia.value}`, { method: 'POST' });
     if (!resposta.ok) {
       mostrar(acao, (await resposta.text()).trim(), 'erro');
       li.dataset.ocupado = 'nao';

@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 )
 
@@ -23,7 +25,7 @@ var (
 	tasks      = map[string]*Task{}
 )
 
-func startDownload(config Config, company *Company) (*Task, error) {
+func startDownload(config Config, company *Company, competence string) (*Task, error) {
 	tasksMutex.Lock()
 	defer tasksMutex.Unlock()
 
@@ -40,12 +42,12 @@ func startDownload(config Config, company *Company) (*Task, error) {
 	}
 	tasks[company.Root] = task
 
-	go runDownload(config, company, task)
+	go runDownload(config, company, task, competence)
 
 	return task, nil
 }
 
-func runDownload(config Config, company *Company, task *Task) {
+func runDownload(config Config, company *Company, task *Task, competence string) {
 	state, err := loadState(config.StatePath)
 	if err != nil {
 		finish(task, "erro", 0, 0, "", err.Error())
@@ -68,8 +70,20 @@ func runDownload(config Config, company *Company, task *Task) {
 	finish(task, "pronto", result.Saved, result.Failed, result.Folder, "")
 
 	if result.Saved > 0 {
-		openFolder(result.Folder)
+		openFolder(folderToOpen(result.Folder, company.CNPJs, competence))
 	}
+}
+
+func folderToOpen(companyDir string, cnpjs []string, competence string) string {
+	if len(cnpjs) != 1 || !validCompetence(competence) {
+		return companyDir
+	}
+
+	monthDir := filepath.Join(companyDir, cnpjs[0], competence)
+	if _, err := os.Stat(monthDir); err != nil {
+		return companyDir
+	}
+	return monthDir
 }
 
 func finish(task *Task, status string, saved, failed int, folder, message string) {

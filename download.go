@@ -62,8 +62,7 @@ func downloadRoot(config Config, state NSUState, root string, cnpjs []string, ta
 	commonNameParts := strings.Split(companyCert.Subject.CommonName, ":")
 	companyName := strings.TrimSpace(commonNameParts[0])
 
-	safeName := strings.NewReplacer("/", "-", `\`, "-", ":", "-").Replace(companyName)
-	result.Folder = filepath.Join(config.XMLBaseDir, safeName+"_"+root)
+	result.Folder = companyFolder(config, companyName, root)
 
 	log.Printf("=== %s (raiz %s) - validade %s ===",
 		companyName, root, companyCert.NotAfter.Format("02/01/2006"))
@@ -113,13 +112,11 @@ func downloadRoot(config Config, state NSUState, root string, cnpjs []string, ta
 }
 
 func downloadCNPJ(httpClient *http.Client, config Config, state NSUState, companyName, targetCNPJ string, task *Task) (int, int, error) {
-	safeName := strings.NewReplacer("/", "-", `\`, "-", ":", "-").Replace(companyName)
-
 	root := targetCNPJ
 	if len(targetCNPJ) >= 8 {
 		root = targetCNPJ[:8]
 	}
-	groupFolder := safeName + "_" + root
+	cnpjFolder := filepath.Join(companyFolder(config, companyName, root), targetCNPJ)
 
 	cnpjConsulta := targetCNPJ
 
@@ -174,13 +171,13 @@ func downloadCNPJ(httpClient *http.Client, config Config, state NSUState, compan
 				continue
 			}
 
-			issueDate := extractIssueDate(xmlContent)
-
 			var outputDir string
 			if document.TipoDocumento == "EVENTO" {
-				outputDir = filepath.Join(config.XMLBaseDir, groupFolder, targetCNPJ, "_eventos")
+				outputDir = filepath.Join(cnpjFolder, "_eventos")
 			} else {
-				outputDir = filepath.Join(config.XMLBaseDir, groupFolder, targetCNPJ, issueDate)
+				outputDir = filepath.Join(cnpjFolder,
+					extractCompetence(xmlContent),
+					serviceDirection(document.ChaveAcesso, targetCNPJ))
 			}
 
 			filename := document.ChaveAcesso + ".xml"
@@ -229,14 +226,14 @@ func downloadCNPJ(httpClient *http.Client, config Config, state NSUState, compan
 	return savedCount, failedCount, nil
 }
 
-func extractIssueDate(xmlContent []byte) string {
+func extractCompetence(xmlContent []byte) string {
 	text := string(xmlContent)
 
-	start := strings.Index(text, "<dhProc>")
+	start := strings.Index(text, "<dCompet>")
 	if start < 0 {
 		return "sem-data"
 	}
-	start += len("<dhProc>")
+	start += len("<dCompet>")
 
 	if len(text) < start+7 {
 		return "sem-data"
@@ -246,6 +243,71 @@ func extractIssueDate(xmlContent []byte) string {
 	month := text[start+5 : start+7]
 
 	return year + "-" + month
+}
+
+const (
+	folderTaken    = "tomadas"
+	folderProvided = "prestadas"
+)
+
+func serviceDirection(accessKey, targetCNPJ string) string {
+	if len(accessKey) >= 23 && accessKey[9:23] == targetCNPJ {
+		return folderProvided
+	}
+	return folderTaken
+}
+
+type MonthFolder struct {
+	CNPJ     string `json:"cnpj"`
+	Path     string `json:"caminho"`
+	Taken    int    `json:"tomadas"`
+	Provided int    `json:"prestadas"`
+}
+
+func summarizeMonth(companyDir string, cnpjs []string, competence string) []MonthFolder {
+	summary := make([]MonthFolder, 0, len(cnpjs))
+	for _, cnpj := range cnpjs {
+		monthDir := filepath.Join(companyDir, cnpj, competence)
+		summary = append(summary, MonthFolder{
+			CNPJ:     cnpj,
+			Path:     monthDir,
+			Taken:    countXML(filepath.Join(monthDir, folderTaken)),
+			Provided: countXML(filepath.Join(monthDir, folderProvided)),
+		})
+	}
+	return summary
+}
+
+func countXML(dir string) int {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return 0
+	}
+
+	count := 0
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".xml") {
+			count++
+		}
+	}
+	return count
+}
+
+func validCompetence(competence string) bool {
+	if len(competence) != 7 || competence[4] != '-' {
+		return false
+	}
+	for i, char := range competence {
+		if i != 4 && (char < '0' || char > '9') {
+			return false
+		}
+	}
+	return true
+}
+
+func companyFolder(config Config, companyName, root string) string {
+	safeName := strings.NewReplacer("/", "-", `\`, "-", ":", "-").Replace(companyName)
+	return filepath.Join(config.XMLBaseDir, safeName+"_"+root)
 }
 
 func writeWithRetries(createdDirs map[string]bool, dir, path string, content []byte) error {
