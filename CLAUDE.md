@@ -18,6 +18,7 @@ go build -ldflags="-H=windowsgui" -o portalnacional.exe .
 
 go run .                                # sem argumento = a tela (é onde o duplo clique cai)
 go run . --tela                         # idem, explícito
+go run . --segundo-plano                # a tela sem abrir o navegador (é o que o Windows chama no login)
 go run . --scan                         # lista os certificados encontrados
 go run . --cert <raiz8>                 # mostra o certificado de uma raiz
 go run . --empresa <raiz8> [cnpj14...]  # baixa uma empresa; sem cnpj, lê os do CSV
@@ -36,7 +37,7 @@ O programa decide o que baixar **só pelo ponteiro, nunca olhando o disco** — 
 
 ## Arquitetura
 
-Package `main` único, arquivos divididos por assunto: `adn.go` (HTTP e API), `certificate.go` (.pfx e mTLS), `clients.go` (CSV), `config.go`, `download.go` (orquestração e gravação), `state.go` (ponteiro), `main.go` (modos de linha de comando), `web.go` (as rotas e o servidor), `page.html` (a página, embutida no binário via `//go:embed`), `tasks.go` (downloads em segundo plano).
+Package `main` único, arquivos divididos por assunto: `adn.go` (HTTP e API), `certificate.go` (.pfx e mTLS), `clients.go` (CSV), `config.go`, `download.go` (orquestração e gravação), `state.go` (ponteiro), `main.go` (modos de linha de comando), `web.go` (as rotas e o servidor), `autostart.go` (subir com o Windows), `page.html` (a página, embutida no binário via `//go:embed`), `tasks.go` (downloads em segundo plano).
 
 **Um package só é de propósito** — pasta em Go existe para criar package novo, e 1.500 linhas não pedem isso. Só os arquivos que não são Go moram em pasta: `assets/` (as imagens embutidas via `//go:embed assets/...`) e `docs/` (`swagger.json` e o print da tela usado no README). Os `.exemplo` ficam na raiz porque documentam formato.
 
@@ -66,6 +67,8 @@ Duplo clique sem argumento cai na tela. Como o binário de release é linkado co
 - **Erro de subida vira caixa do Windows.** `fatal` registra no log e chama `showError` (`MessageBoxW` via `syscall`), senão a falha seria invisível.
 - **O `config.json` é procurado ao lado do exe** (`findConfig`), com queda para o caminho relativo, que é o que mantém o `go run .` funcionando no repositório.
 
+**Sobe sozinho com o Windows.** O doctracker (que roda no servidor) tem no menu um link para `http://localhost:8090` — o Portal do PC de quem clica. Se o exe não estiver no ar, o link cai no vazio, e o servidor não tem como iniciar programa no PC do auxiliar. Por isso, toda vez que a tela sobe, `registerAutostart` grava `"<exe>" --segundo-plano` em `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` (via `RegSetKeyValueW`, sem dependência nova). `--segundo-plano` sobe o servidor **sem abrir aba**, e se já houver instância sai em silêncio. Antes de ler o CSV ele espera até 3 min o Drive montar (`waitForDrive`), senão o login mostraria caixa de erro. `isTemporaryBuild` pula o registro sob `go run` e em pasta temporária, para não deixar o Windows apontando para um exe que some. Para desfazer: apagar o valor `PortalNacional` dessa chave.
+
 **O programa não tem como ser encerrado, e isso é decisão.** Ele sobe e fica no ar, como um serviço — fechar a aba não desliga nada, porque navegador e servidor são processos separados. Botão "Encerrar" na página e heartbeat foram propostos e recusados: não é o padrão e custa complexidade. Desligar é tarefa de quem administra a máquina.
 
 ### O modelo NSU — o conceito que explica o resto
@@ -80,7 +83,6 @@ Três consequências que orientam o código todo:
 
 ### Certificados
 
-- O certificado pode vir como `.pfx` **ou `.p12`** — é o mesmo formato PKCS#12, só muda a extensão. `isCertificateFile` aceita os dois; antes só `.pfx` era lido e a tela acusava "Sem certificado" com o `.p12` válido na pasta.
 - O certificado pode vir como `.pfx` **ou `.p12`** — é o mesmo formato PKCS#12, só muda a extensão. `isCertificateFile` aceita os dois; antes só `.pfx` era lido e a tela acusava "Sem certificado" com o `.p12` válido na pasta.
 - `extractPasswordFromFilename` cobre os formatos de nome de arquivo aceitos; os casos estão em `main_test.go`, com dados inventados — acrescente lá antes de mexer na função.
 - Certificados ICP-Brasil vêm em **BER** e o Go só lê **DER**. `loadCertificate` tenta ler direto, cai para um cache em `convertidosDir` e, em último caso, reconverte chamando **`pwsh`** (PowerShell 7 — `powershell.exe` 5.1 não serve). Conversão em Go puro foi tentada e falhou; não repita.

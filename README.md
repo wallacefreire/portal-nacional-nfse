@@ -100,6 +100,7 @@ O `config.json` não vai para o controle de versão, porque contém caminhos int
 
 ```bash
 go run . --tela                          # interface web em http://localhost:8080
+go run . --segundo-plano                 # a mesma tela sem abrir o navegador (usado ao ligar o Windows)
 go run . --empresa <raiz8> [cnpj14...]   # uma empresa; sem CNPJ, lê os do CSV
 go run . --todas [limite]                # todas as empresas do CSV
 go run . --scan                          # lista os certificados encontrados

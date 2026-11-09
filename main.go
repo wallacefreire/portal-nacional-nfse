@@ -60,8 +60,13 @@ func main() {
 		log.Println("Notas no formato antigo guardadas em " + retired + " - o download começa do zero no formato novo")
 	}
 
-	if len(os.Args) == 1 || os.Args[1] == "--tela" {
-		if err := serveWeb(config, config.Address); err != nil {
+	if len(os.Args) == 1 || os.Args[1] == "--tela" || os.Args[1] == backgroundFlag {
+		background := len(os.Args) > 1 && os.Args[1] == backgroundFlag
+		if background {
+			config = waitForDrive(config, 3*time.Minute)
+		}
+		registerAutostart()
+		if err := serveWeb(config, config.Address, !background); err != nil {
 			fatal(err)
 		}
 		return

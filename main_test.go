@@ -238,25 +238,6 @@ func TestSummarizeMonthAndFolderToOpen(t *testing.T) {
 	}
 }
 
-func TestFindCertificateAcceptsP12(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "EMPRESA EXEMPLO LTDA -- 11111111000191 -- SENHA abcd1234.p12")
-	if err := os.WriteFile(path, []byte("x"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "OUTRA -- 11111111000191 -- senha x.txt"), []byte("x"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	found, password, err := findCertificate(dir, "11111111")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if found != path || password != "abcd1234" {
-		t.Errorf("achou %q com senha %q", filepath.Base(found), password)
-	}
-}
-
 func writeTestFile(t *testing.T, path string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -338,4 +319,39 @@ func TestRetireOldLayout(t *testing.T) {
 			t.Errorf("o ponteiro antigo continuou no lugar")
 		}
 	})
+}
+
+func TestFindCertificateAcceptsP12(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "EMPRESA EXEMPLO LTDA -- 11111111000191 -- SENHA abcd1234.p12")
+	if err := os.WriteFile(path, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "OUTRA -- 11111111000191 -- senha x.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	found, password, err := findCertificate(dir, "11111111")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found != path || password != "abcd1234" {
+		t.Errorf("achou %q com senha %q", filepath.Base(found), password)
+	}
+}
+
+func TestIsTemporaryBuild(t *testing.T) {
+	cases := []struct {
+		exe  string
+		want bool
+	}{
+		{`C:\ContaComigo\NFSE\portalnacional.exe`, false},
+		{`C:\Users\Fulano\AppData\Local\go-build\ab\cd\exe\portalnacional.exe`, true},
+		{filepath.Join(os.TempDir(), "go-run123", "portalnacional.exe"), true},
+	}
+	for _, c := range cases {
+		if got := isTemporaryBuild(c.exe); got != c.want {
+			t.Errorf("%s: deu %v, esperava %v", c.exe, got, c.want)
+		}
+	}
 }

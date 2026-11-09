@@ -23,7 +23,7 @@ var pageHTML string
 
 var page = template.Must(template.New("page").Parse(pageHTML))
 
-func serveWeb(config Config, address string) error {
+func serveWeb(config Config, address string, showPage bool) error {
 	companies, err := loadCompanies(config.ClientsCSV)
 	if err != nil {
 		return err
@@ -123,13 +123,17 @@ func serveWeb(config Config, address string) error {
 		}
 		running.Close()
 
-		log.Println("Já existe uma instância no ar - abrindo " + url)
-		openBrowser(url)
+		if showPage {
+			log.Println("Já existe uma instância no ar - abrindo " + url)
+			openBrowser(url)
+		}
 		return nil
 	}
 
 	log.Println("servidor no ar em " + url + " - Ctrl+C para encerrar")
-	openBrowser(url)
+	if showPage {
+		openBrowser(url)
+	}
 
 	return http.Serve(listener, nil)
 }
