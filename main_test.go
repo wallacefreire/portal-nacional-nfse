@@ -236,3 +236,22 @@ func TestSummarizeMonthAndFolderToOpen(t *testing.T) {
 		}
 	}
 }
+
+func TestFindCertificateAcceptsP12(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "EMPRESA EXEMPLO LTDA -- 11111111000191 -- SENHA abcd1234.p12")
+	if err := os.WriteFile(path, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "OUTRA -- 11111111000191 -- senha x.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	found, password, err := findCertificate(dir, "11111111")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found != path || password != "abcd1234" {
+		t.Errorf("achou %q com senha %q", filepath.Base(found), password)
+	}
+}

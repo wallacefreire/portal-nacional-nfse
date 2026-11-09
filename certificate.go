@@ -52,7 +52,7 @@ func findCertificate(certDir, root string) (string, string, error) {
 	var chosenTime time.Time
 
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.EqualFold(filepath.Ext(entry.Name()), ".pfx") {
+		if entry.IsDir() || !isCertificateFile(entry.Name()) {
 			continue
 		}
 
@@ -181,6 +181,11 @@ func convertWithWindows(originalPath, cachePath, password string) error {
 	return nil
 }
 
+func isCertificateFile(name string) bool {
+	extension := filepath.Ext(name)
+	return strings.EqualFold(extension, ".pfx") || strings.EqualFold(extension, ".p12")
+}
+
 func extractPasswordFromFilename(filename string) (string, error) {
 	name := strings.TrimSuffix(filename, filepath.Ext(filename))
 
@@ -231,7 +236,7 @@ func scanCertificates(dir string) {
 	failCount := 0
 
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.EqualFold(filepath.Ext(entry.Name()), ".pfx") {
+		if entry.IsDir() || !isCertificateFile(entry.Name()) {
 			continue
 		}
 

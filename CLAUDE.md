@@ -80,6 +80,7 @@ Três consequências que orientam o código todo:
 
 ### Certificados
 
+- O certificado pode vir como `.pfx` **ou `.p12`** — é o mesmo formato PKCS#12, só muda a extensão. `isCertificateFile` aceita os dois; antes só `.pfx` era lido e a tela acusava "Sem certificado" com o `.p12` válido na pasta.
 - `extractPasswordFromFilename` cobre os formatos de nome de arquivo aceitos; os casos estão em `main_test.go`, com dados inventados — acrescente lá antes de mexer na função.
 - Certificados ICP-Brasil vêm em **BER** e o Go só lê **DER**. `loadCertificate` tenta ler direto, cai para um cache em `convertidosDir` e, em último caso, reconverte chamando **`pwsh`** (PowerShell 7 — `powershell.exe` 5.1 não serve). Conversão em Go puro foi tentada e falhou; não repita.
 - Quando existe **mais de um `.pfx` para a mesma raiz** (renovação: o antigo fica na pasta ao lado do novo), `findCertificate` fica com o de **modificação mais recente** e registra no log quantos achou. Antes ele pegava o primeiro em ordem alfabética, o que podia escolher o vencido e a tela acusar "Certificado vencido" com um certificado válido do lado.
