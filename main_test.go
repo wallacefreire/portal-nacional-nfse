@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -254,4 +255,87 @@ func TestFindCertificateAcceptsP12(t *testing.T) {
 	if found != path || password != "abcd1234" {
 		t.Errorf("achou %q com senha %q", filepath.Base(found), password)
 	}
+}
+
+func writeTestFile(t *testing.T, path string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("<NFSe/>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRetireOldLayout(t *testing.T) {
+	now := time.Date(2026, 11, 9, 8, 30, 0, 0, time.Local)
+	cnpj := filepath.Join("EMPRESA TESTE_11111111", "11111111000191")
+
+	t.Run("formato antigo é guardado e o controle zera junto", func(t *testing.T) {
+		base := filepath.Join(t.TempDir(), "NFSE")
+		config := Config{XMLBaseDir: base, StatePath: filepath.Join(base, "_controle", "nsu.json")}
+		writeTestFile(t, filepath.Join(base, cnpj, "2026-10", "nota.xml"))
+		writeTestFile(t, config.StatePath)
+
+		retired, err := retireOldLayout(config, now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if retired != base+"-antigo-2026-11-09_083000" {
+			t.Errorf("pasta guardada: %q", retired)
+		}
+		if _, err := os.Stat(filepath.Join(retired, cnpj, "2026-10", "nota.xml")); err != nil {
+			t.Errorf("a nota antiga sumiu: %v", err)
+		}
+		if _, err := os.Stat(config.StatePath); !errors.Is(err, os.ErrNotExist) {
+			t.Errorf("o ponteiro antigo continuou no lugar")
+		}
+		if _, err := os.Stat(filepath.Dir(config.StatePath)); err != nil {
+			t.Errorf("a pasta de controle não foi recriada: %v", err)
+		}
+	})
+
+	t.Run("formato novo fica intocado", func(t *testing.T) {
+		base := filepath.Join(t.TempDir(), "NFSE")
+		config := Config{XMLBaseDir: base, StatePath: filepath.Join(base, "_controle", "nsu.json")}
+		writeTestFile(t, filepath.Join(base, cnpj, "2026-10", folderTaken, "nota.xml"))
+		writeTestFile(t, filepath.Join(base, cnpj, "_eventos", "evento.xml"))
+		writeTestFile(t, config.StatePath)
+
+		retired, err := retireOldLayout(config, now)
+		if err != nil || retired != "" {
+			t.Fatalf("não devia mexer: %q, %v", retired, err)
+		}
+		if _, err := os.Stat(config.StatePath); err != nil {
+			t.Errorf("o ponteiro sumiu: %v", err)
+		}
+	})
+
+	t.Run("pasta vazia fica intocada", func(t *testing.T) {
+		base := filepath.Join(t.TempDir(), "NFSE")
+		os.MkdirAll(filepath.Join(base, "_controle"), 0o755)
+		config := Config{XMLBaseDir: base, StatePath: filepath.Join(base, "_controle", "nsu.json")}
+
+		if retired, err := retireOldLayout(config, now); err != nil || retired != "" {
+			t.Fatalf("não devia mexer: %q, %v", retired, err)
+		}
+	})
+
+	t.Run("controle fora da pasta das notas também zera", func(t *testing.T) {
+		dir := t.TempDir()
+		base := filepath.Join(dir, "NFSE")
+		config := Config{XMLBaseDir: base, StatePath: filepath.Join(dir, "controle", "nsu.json")}
+		writeTestFile(t, filepath.Join(base, cnpj, "sem-data", "nota.xml"))
+		writeTestFile(t, config.StatePath)
+
+		if _, err := retireOldLayout(config, now); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Stat(config.StatePath + ".antigo-2026-11-09_083000"); err != nil {
+			t.Errorf("o ponteiro não foi guardado: %v", err)
+		}
+		if _, err := os.Stat(config.StatePath); !errors.Is(err, os.ErrNotExist) {
+			t.Errorf("o ponteiro antigo continuou no lugar")
+		}
+	})
 }

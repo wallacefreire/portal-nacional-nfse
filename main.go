@@ -52,6 +52,14 @@ func main() {
 		fatal(err)
 	}
 
+	retired, err := retireOldLayout(config, time.Now())
+	if err != nil {
+		fatal(err)
+	}
+	if retired != "" {
+		log.Println("Notas no formato antigo guardadas em " + retired + " - o download começa do zero no formato novo")
+	}
+
 	if len(os.Args) == 1 || os.Args[1] == "--tela" {
 		if err := serveWeb(config, config.Address); err != nil {
 			fatal(err)

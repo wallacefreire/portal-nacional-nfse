@@ -2,9 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 )
 
 type Config struct {
@@ -65,6 +68,70 @@ func applyDefaults(config Config) (Config, error) {
 	}
 
 	return config, nil
+}
+
+func retireOldLayout(config Config, now time.Time) (string, error) {
+	if !hasOldLayout(config.XMLBaseDir) {
+		return "", nil
+	}
+
+	stamp := now.Format("2006-01-02_150405")
+	retired := config.XMLBaseDir + "-antigo-" + stamp
+	if err := os.Rename(config.XMLBaseDir, retired); err != nil {
+		return "", fmt.Errorf("a pasta %s está no formato antigo e não consegui renomeá-la "+
+			"(feche as janelas abertas dentro dela e abra o programa de novo): %w", config.XMLBaseDir, err)
+	}
+
+	if !isInside(config.XMLBaseDir, config.StatePath) {
+		if err := os.Rename(config.StatePath, config.StatePath+".antigo-"+stamp); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return retired, fmt.Errorf("renomeei as notas para %s, mas não consegui zerar o controle %s: %w",
+				retired, config.StatePath, err)
+		}
+	}
+
+	if err := os.MkdirAll(config.XMLBaseDir, 0o755); err != nil {
+		return retired, fmt.Errorf("não consegui criar a pasta %s: %w", config.XMLBaseDir, err)
+	}
+	if err := os.MkdirAll(filepath.Dir(config.StatePath), 0o755); err != nil {
+		return retired, fmt.Errorf("não consegui criar a pasta de controle: %w", err)
+	}
+
+	return retired, nil
+}
+
+func hasOldLayout(baseDir string) bool {
+	for _, company := range subdirs(baseDir) {
+		for _, cnpj := range subdirs(company) {
+			for _, month := range subdirs(cnpj) {
+				if filepath.Base(month) == "_eventos" {
+					continue
+				}
+				entries, _ := os.ReadDir(month)
+				for _, entry := range entries {
+					if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".xml") {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
+}
+
+func subdirs(dir string) []string {
+	entries, _ := os.ReadDir(dir)
+	paths := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() {
+			paths = append(paths, filepath.Join(dir, entry.Name()))
+		}
+	}
+	return paths
+}
+
+func isInside(dir, path string) bool {
+	relative, err := filepath.Rel(dir, path)
+	return err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))
 }
 
 func besideExe(name string) string {

@@ -81,6 +81,7 @@ Três consequências que orientam o código todo:
 ### Certificados
 
 - O certificado pode vir como `.pfx` **ou `.p12`** — é o mesmo formato PKCS#12, só muda a extensão. `isCertificateFile` aceita os dois; antes só `.pfx` era lido e a tela acusava "Sem certificado" com o `.p12` válido na pasta.
+- O certificado pode vir como `.pfx` **ou `.p12`** — é o mesmo formato PKCS#12, só muda a extensão. `isCertificateFile` aceita os dois; antes só `.pfx` era lido e a tela acusava "Sem certificado" com o `.p12` válido na pasta.
 - `extractPasswordFromFilename` cobre os formatos de nome de arquivo aceitos; os casos estão em `main_test.go`, com dados inventados — acrescente lá antes de mexer na função.
 - Certificados ICP-Brasil vêm em **BER** e o Go só lê **DER**. `loadCertificate` tenta ler direto, cai para um cache em `convertidosDir` e, em último caso, reconverte chamando **`pwsh`** (PowerShell 7 — `powershell.exe` 5.1 não serve). Conversão em Go puro foi tentada e falhou; não repita.
 - Quando existe **mais de um `.pfx` para a mesma raiz** (renovação: o antigo fica na pasta ao lado do novo), `findCertificate` fica com o de **modificação mais recente** e registra no log quantos achou. Antes ele pegava o primeiro em ordem alfabética, o que podia escolher o vencido e a tela acusar "Certificado vencido" com um certificado válido do lado.
@@ -104,7 +105,7 @@ O mês vem de `<dCompet>` (**competência**, não processamento), formato `AAAA-
 
 A regra que monta `<NOME>_<raiz8>` mora só em `companyFolder`: `downloadCNPJ` grava nela e `downloadRoot` devolve o mesmo caminho em `Result.Folder`, que é a pasta que a tela abre.
 
-⚠️ Mudar o layout não move o que já está no disco, e o ponteiro não rebaixa sozinho. Para reorganizar, renomeie a pasta `NFSE` inteira (o `nsu.json` mora dentro dela, em `_controle`) e rebaixe — o programa recria tudo.
+⚠️ Mudar o layout não move o que já está no disco, e o ponteiro não rebaixa sozinho. Por isso, na subida, `retireOldLayout` procura XML solto direto na pasta do mês (`<cnpj>/<AAAA-MM>/*.xml`, a marca do formato antigo). Achando, renomeia `xmlBaseDir` para `<xmlBaseDir>-antigo-<data_hora>` — o `nsu.json` vai junto quando mora dentro dela, senão é renomeado à parte — e o programa começa do zero no formato novo. Não usa arquivo marcador: decide pelo conteúdo, então pasta vazia ou já no formato novo nunca é tocada. Se o rename falhar (janela do Explorer aberta dentro da pasta), `fatal` mostra a caixa de erro em vez de seguir e misturar formatos. Foi o que reduziu a atualização da máquina do auxiliar a "fechar o programa e copiar o exe". Se um dia o layout mudar de novo, esta detecção precisa mudar junto.
 
 ### Configuração
 
