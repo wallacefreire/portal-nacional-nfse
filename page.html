@@ -3,26 +3,66 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <title>NFS-e | Conta Comigo</title>
 <style>
   :root {
+    color-scheme: light dark;
     --azul: #0B2A8C;
     --azul-fundo: #071D63;
     --verde: #5CB944;
-    --lima: #A3D53C;
-    --cinza: #f4f6fb;
-    --borda: #e1e5f0;
+
+    --fundo: #f3f5fa;
+    --cartao: #ffffff;
+    --painel: #f8f9fc;
+    --borda: #e2e6f0;
     --texto: #1c2033;
+    --suave: #6b7189;
+    --realce: #0B2A8C;
+    --realce-fundo: #eef2ff;
+    --foco: rgba(11, 42, 140, .14);
+    --sombra: 0 1px 2px rgba(16, 24, 64, .05), 0 2px 8px rgba(16, 24, 64, .04);
+    --sombra-alta: 0 4px 14px rgba(16, 24, 64, .10);
+
+    --ok-fundo: #e8f6e6;   --ok-texto: #2f7d20;   --ok-borda: #bfe3ba;
+    --erro-fundo: #fdeaea; --erro-texto: #a52020; --erro-borda: #f2c4c4;
+    --pend-fundo: #fff6e5; --pend-texto: #8a5a00; --pend-borda: #f0d7a4;
+    --rodando-fundo: #eef0f7; --rodando-texto: #6b7189;
   }
 
-    * { box-sizing: border-box; }
+  /* Tema escuro próprio: sem ele o Chrome escurece a página sozinho e as cores ficam estranhas. */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fundo: #0d1016;
+      --cartao: #151a23;
+      --painel: #10141c;
+      --borda: #252c39;
+      --texto: #e6e8ef;
+      --suave: #9299ad;
+      --realce: #9db2ff;
+      --realce-fundo: rgba(157, 178, 255, .10);
+      --foco: rgba(157, 178, 255, .22);
+      --sombra: 0 1px 2px rgba(0, 0, 0, .3);
+      --sombra-alta: 0 6px 18px rgba(0, 0, 0, .45);
+
+      --ok-fundo: rgba(92, 185, 68, .13);    --ok-texto: #8fd67a;   --ok-borda: rgba(92, 185, 68, .35);
+      --erro-fundo: rgba(229, 72, 77, .13);  --erro-texto: #ff9a9a; --erro-borda: rgba(229, 72, 77, .38);
+      --pend-fundo: rgba(240, 170, 40, .13); --pend-texto: #f3c26b; --pend-borda: rgba(240, 170, 40, .38);
+      --rodando-fundo: #1d2330; --rodando-texto: #9299ad;
+    }
+  }
+
+  * { box-sizing: border-box; }
 
   body {
     margin: 0;
     font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
     color: var(--texto);
-    background: var(--cinza);
+    background: var(--fundo);
+    -webkit-font-smoothing: antialiased;
   }
+
+  [hidden] { display: none !important; }
 
   header {
     position: sticky;
@@ -51,34 +91,62 @@
   }
 
   main {
-    max-width: 760px;
-    margin: 2rem auto;
+    max-width: 820px;
+    margin: 2rem auto 4rem;
     padding: 0 1.5rem;
   }
 
   h1 {
-    font-size: 1.3rem;
-    margin: 0 0 1rem;
+    font-size: 1.35rem;
+    font-weight: 650;
+    letter-spacing: -.01em;
+    margin: 0 0 .25rem;
   }
 
   .busca-area {
     position: sticky;
     top: 75px;
-    background: var(--cinza);
-    padding: 1rem 0 .6rem;
+    background: var(--fundo);
+    padding: 1rem 0 .75rem;
     z-index: 10;
   }
 
-  .campo { position: relative; }
+  .linha-busca {
+    display: flex;
+    gap: .75rem;
+    align-items: stretch;
+  }
+
+  .campo {
+    position: relative;
+    flex: 1;
+  }
+
+  #busca,
+  #competencia {
+    font: inherit;
+    color: var(--texto);
+    background: var(--cartao);
+    border: 1px solid var(--borda);
+    border-radius: 12px;
+    box-shadow: var(--sombra);
+    transition: border-color .15s, box-shadow .15s;
+  }
 
   #busca {
     width: 100%;
+    height: 100%;
     padding: .85rem 2.9rem .85rem 1rem;
     font-size: 1rem;
-    border: 1px solid var(--borda);
-    border-radius: 10px;
-    background: #fff;
-    transition: border-color .15s, box-shadow .15s;
+  }
+
+  #busca::placeholder { color: var(--suave); }
+
+  #busca:focus,
+  #competencia:focus {
+    outline: none;
+    border-color: var(--realce);
+    box-shadow: 0 0 0 3px var(--foco);
   }
 
   #limpar {
@@ -94,30 +162,38 @@
     border: none;
     border-radius: 50%;
     background: transparent;
-    color: #8b90a6;
+    color: var(--suave);
     font-size: 1.35rem;
     line-height: 1;
     cursor: pointer;
-    transition: background .12s, color .12s;
   }
 
   #limpar:hover {
-    background: #eef0f7;
+    background: var(--rodando-fundo);
     color: var(--texto);
   }
 
-  #limpar[hidden] { display: none; }
+  .competencia {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: .2rem;
+    font-size: .72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--suave);
+  }
 
-  #busca:focus {
-    outline: none;
-    border-color: var(--azul);
-    box-shadow: 0 0 0 3px rgba(11, 42, 140, .12);
+  #competencia {
+    padding: .55rem .8rem;
+    font-size: .95rem;
   }
 
   #contador {
-    font-size: .85rem;
-    color: #6b7189;
-    margin: .7rem 0 0;
+    font-size: .82rem;
+    color: var(--suave);
+    margin: .7rem .2rem 0;
     text-align: right;
   }
 
@@ -125,173 +201,215 @@
     list-style: none;
     margin: 0;
     padding: 0;
-    background: #fff;
-    border-radius: 12px;
-    box-shadow: 0 1px 2px rgba(16, 24, 64, .06),
-                0 4px 16px rgba(16, 24, 64, .06);
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
   }
 
   li {
-    position: relative;
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
-    gap: 1rem;
+    gap: .75rem 1rem;
     padding: .9rem 1.1rem;
-    background: #fff;
-    border-bottom: 1px solid #f0f2f8;
+    background: var(--cartao);
+    border: 1px solid var(--borda);
+    border-radius: 12px;
+    box-shadow: var(--sombra);
     cursor: pointer;
-    transition: transform .14s ease, box-shadow .14s ease;
-  }
-
-  li:first-child { border-radius: 12px 12px 0 0; }
-
-  li:last-child {
-    border-bottom: none;
-    border-radius: 0 0 12px 12px;
+    transition: border-color .15s, box-shadow .15s;
   }
 
   li:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 18px rgba(16, 24, 64, .13);
-    border-radius: 10px;
-    z-index: 2;
+    border-color: var(--realce);
+    box-shadow: var(--sombra-alta);
   }
-  
-  li[hidden] { display: none; }
 
-  .nome { font-weight: 500; }
+  .nome {
+    font-weight: 600;
+    min-width: 0;
+  }
+
+  .direita {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-left: auto;
+  }
 
   .raiz {
-    color: #7a8099;
+    color: var(--suave);
     font-size: .85rem;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
 
   .filiais {
-    color: var(--verde);
-    font-weight: 600;
     margin-left: .5rem;
-  }
-
-    .direita {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
+    padding: .12rem .5rem;
+    border-radius: 999px;
+    background: var(--ok-fundo);
+    color: var(--ok-texto);
+    font-size: .75rem;
+    font-weight: 600;
   }
 
   .acao {
-    min-width: 7rem;
+    min-width: 7.5rem;
     text-align: center;
-    padding: .4rem .9rem;
+    padding: .45rem .95rem;
     border-radius: 999px;
     font-size: .82rem;
     font-weight: 600;
-    background: #fff;
-    color: var(--verde);
-    border: 1px solid var(--verde);
+    background: transparent;
+    color: var(--ok-texto);
+    border: 1px solid var(--ok-borda);
+    transition: background .15s, color .15s;
   }
 
-    li:hover .acao {
+  li:hover .acao {
     background: var(--verde);
+    border-color: var(--verde);
     color: #fff;
   }
 
   .acao.rodando,
   li:hover .acao.rodando {
-    background: #eef0f7;
-    color: #6b7189;
-    border-color: #dfe3ee;
+    background: var(--rodando-fundo);
+    color: var(--rodando-texto);
+    border-color: var(--borda);
   }
 
   .acao.pronto,
   li:hover .acao.pronto {
-    background: #e8f6e6;
-    color: #2f7d20;
-    border-color: #bfe3ba;
+    background: var(--ok-fundo);
+    color: var(--ok-texto);
+    border-color: var(--ok-borda);
   }
 
   .acao.erro,
   li:hover .acao.erro {
-    background: #fdeaea;
-    color: #a52020;
-    border-color: #f2c4c4;
+    background: var(--erro-fundo);
+    color: var(--erro-texto);
+    border-color: var(--erro-borda);
   }
 
   .acao.pendencia,
   li:hover .acao.pendencia {
-    background: #fff6e5;
-    color: #8a5a00;
-    border-color: #f0d7a4;
+    background: var(--pend-fundo);
+    color: var(--pend-texto);
+    border-color: var(--pend-borda);
   }
-
-  .linha-busca {
-    display: flex;
-    gap: .75rem;
-    align-items: stretch;
-  }
-
-  .linha-busca .campo { flex: 1; }
-
-  .competencia {
-    display: flex;
-    align-items: center;
-    gap: .5rem;
-    font-size: .85rem;
-    color: #6b7189;
-    white-space: nowrap;
-  }
-
-  #competencia {
-    padding: .7rem .8rem;
-    font: inherit;
-    font-size: .95rem;
-    color: var(--texto);
-    border: 1px solid var(--borda);
-    border-radius: 10px;
-    background: #fff;
-  }
-
-  li { flex-wrap: wrap; }
 
   .mes {
-    flex-basis: 100%;
+    flex-basis: calc(100% + 2.2rem);
     cursor: default;
-    border-top: 1px dashed var(--borda);
-    padding-top: .7rem;
+    margin: .2rem -1.1rem -.9rem;
+    padding: .8rem 1.1rem .9rem;
+    background: var(--painel);
+    border-top: 1px solid var(--borda);
+    border-radius: 0 0 12px 12px;
     display: flex;
     flex-direction: column;
-    gap: .5rem;
+    gap: .4rem;
   }
 
-  .mes-linha {
+  .mes-titulo {
+    font-size: .72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--suave);
+    margin-bottom: .15rem;
+  }
+
+  .estab {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: .6rem;
-    font-size: .9rem;
+    gap: .5rem 1rem;
+    padding: .55rem .75rem;
+    background: var(--cartao);
+    border: 1px solid var(--borda);
+    border-radius: 10px;
   }
 
-  .mes-linha .resumo { flex: 1; }
+  .estab-id {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+    min-width: 15.5rem;
+  }
+
+  .tipo {
+    font-size: .7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    padding: .12rem .45rem;
+    border-radius: 6px;
+    background: var(--realce-fundo);
+    color: var(--realce);
+  }
+
+  .cnpj {
+    font-size: .88rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .contagens {
+    display: flex;
+    gap: 1.1rem;
+    flex: 1;
+    font-size: .85rem;
+    color: var(--suave);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .contagens strong {
+    font-size: 1rem;
+    font-weight: 650;
+    color: var(--texto);
+  }
+
+  .estab.vazio {
+    background: transparent;
+    border-style: dashed;
+  }
+
+  .estab.vazio .contagens,
+  .estab.vazio .cnpj { opacity: .6; }
+
+  .botoes {
+    display: flex;
+    gap: .4rem;
+    margin-left: auto;
+  }
 
   .botao-mes {
-    padding: .35rem .8rem;
+    padding: .38rem .8rem;
     border-radius: 8px;
-    border: 1px solid var(--azul);
-    background: #fff;
-    color: var(--azul);
+    border: 1px solid var(--borda);
+    background: var(--cartao);
+    color: var(--realce);
     font: inherit;
-    font-size: .82rem;
+    font-size: .8rem;
     font-weight: 600;
     cursor: pointer;
+    transition: background .15s, border-color .15s;
   }
 
   .botao-mes:hover {
-    background: var(--azul);
-    color: #fff;
+    background: var(--realce-fundo);
+    border-color: var(--realce);
   }
 
+  @media (max-width: 640px) {
+    header { padding-left: 1rem; }
+    .linha-busca { flex-direction: column; }
+    .estab-id { min-width: 0; }
+  }
 </style>
 </head>
 <body>
@@ -452,22 +570,31 @@ async function mostrarMes(li) {
     painel.addEventListener('click', (evento) => evento.stopPropagation());
     li.append(painel);
   }
-  painel.replaceChildren(...pastas.map((pasta) => linhaDoMes(li, pasta, mes, pastas.length > 1)));
+
+  // Ordenar pelo CNPJ põe a matriz (0001) em cima.
+  pastas.sort((a, b) => a.cnpj.localeCompare(b.cnpj));
+
+  const titulo = texto('div', 'mes-titulo', 'Competência ' + nomeDoMes(mes));
+  painel.replaceChildren(titulo, ...pastas.map((pasta) => linhaDoMes(li, pasta, mes)));
 }
 
-function linhaDoMes(li, pasta, mes, variosCNPJs) {
+function linhaDoMes(li, pasta, mes) {
+  const vazio = pasta.tomadas + pasta.prestadas === 0;
+
   const linha = document.createElement('div');
-  linha.className = 'mes-linha';
+  linha.className = vazio ? 'estab vazio' : 'estab';
 
-  const resumo = document.createElement('span');
-  resumo.className = 'resumo';
-  resumo.textContent = (variosCNPJs ? pasta.cnpj + ' · ' : '') + nomeDoMes(mes) + ': '
-    + numero(pasta.tomadas) + ' tomadas · ' + numero(pasta.prestadas) + ' prestadas';
-  linha.append(resumo);
+  const tipo = pasta.cnpj.slice(8, 12) === '0001' ? 'Matriz' : 'Filial';
+  const id = texto('div', 'estab-id');
+  id.append(texto('span', 'tipo', tipo), texto('span', 'cnpj', formatarCNPJ(pasta.cnpj)));
 
-  if (pasta.tomadas + pasta.prestadas === 0) return linha;
+  const contagens = texto('div', 'contagens');
+  contagens.append(contagem(pasta.tomadas, 'tomadas'), contagem(pasta.prestadas, 'prestadas'));
 
-  const abrir = botaoDoMes('Abrir pasta do mês', () =>
+  linha.append(id, contagens);
+  if (vazio) return linha;
+
+  const abrir = botaoDoMes('Abrir pasta', () =>
     fetch(`/abrir?raiz=${li.dataset.raiz}&cnpj=${pasta.cnpj}&competencia=${mes}`, { method: 'POST' }));
 
   const copiar = botaoDoMes('Copiar caminho', async () => {
@@ -476,26 +603,48 @@ function linhaDoMes(li, pasta, mes, variosCNPJs) {
     setTimeout(() => { copiar.textContent = 'Copiar caminho'; }, 1500);
   });
 
-  linha.append(abrir, copiar);
+  const botoes = texto('div', 'botoes');
+  botoes.append(abrir, copiar);
+  linha.append(botoes);
   return linha;
 }
 
-function botaoDoMes(texto, aoClicar) {
+function texto(tag, classe, conteudo) {
+  const elemento = document.createElement(tag);
+  elemento.className = classe;
+  if (conteudo !== undefined) elemento.textContent = conteudo;
+  return elemento;
+}
+
+function contagem(valor, rotulo) {
+  const span = document.createElement('span');
+  const forte = document.createElement('strong');
+  forte.textContent = numero(valor);
+  span.append(forte, ' ' + rotulo);
+  return span;
+}
+
+function formatarCNPJ(cnpj) {
+  if (cnpj.length !== 14) return cnpj;
+  return `${cnpj.slice(0, 2)}.${cnpj.slice(2, 5)}.${cnpj.slice(5, 8)}/${cnpj.slice(8, 12)}-${cnpj.slice(12)}`;
+}
+
+function botaoDoMes(rotulo, aoClicar) {
   const botao = document.createElement('button');
   botao.type = 'button';
   botao.className = 'botao-mes';
-  botao.textContent = texto;
+  botao.textContent = rotulo;
   botao.addEventListener('click', aoClicar);
   return botao;
 }
 
-async function copiarTexto(texto) {
+async function copiarTexto(conteudo) {
   if (navigator.clipboard && window.isSecureContext) {
-    await navigator.clipboard.writeText(texto);
+    await navigator.clipboard.writeText(conteudo);
     return;
   }
   const campo = document.createElement('textarea');
-  campo.value = texto;
+  campo.value = conteudo;
   document.body.append(campo);
   campo.select();
   document.execCommand('copy');
