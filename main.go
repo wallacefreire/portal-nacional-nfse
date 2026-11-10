@@ -66,6 +66,7 @@ func main() {
 			config = waitForDrive(config, 3*time.Minute)
 		}
 		registerAutostart()
+		go watchForUpdates(config)
 		if err := serveWeb(config, config.Address, !background); err != nil {
 			fatal(err)
 		}

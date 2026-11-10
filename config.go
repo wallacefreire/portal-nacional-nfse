@@ -17,6 +17,7 @@ type Config struct {
 	StatePath       string `json:"estadoPath"`
 	ClientsCSV      string `json:"clientesCSV"`
 	Address         string `json:"endereco"`
+	UpdateSource    string `json:"atualizacaoExe"`
 }
 
 func loadConfig(path string) (Config, error) {

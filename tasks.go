@@ -127,6 +127,18 @@ func (task *Task) setIssue(kind string) {
 	task.Issue = kind
 }
 
+func downloadRunning() bool {
+	tasksMutex.Lock()
+	defer tasksMutex.Unlock()
+
+	for _, task := range tasks {
+		if task.Status == "rodando" {
+			return true
+		}
+	}
+	return false
+}
+
 func readTask(root string) *Task {
 	tasksMutex.Lock()
 	defer tasksMutex.Unlock()

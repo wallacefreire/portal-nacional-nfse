@@ -86,11 +86,14 @@ cp config.exemplo.json config.json
   "clientesCSV":     "C:\\caminho\\para\\clientes.csv",
   "xmlBaseDir":      "",
   "estadoPath":      "",
-  "endereco":       ""
+  "endereco":       "",
+  "atualizacaoExe":  ""
 }
 ```
 
 Os campos deixados vazios assumem valores padrão e criam as pastas sozinhos: `~/Documents/NFSE` para os XMLs, `~/Documents/NFSE/_controle/nsu.json` para o ponteiro e `localhost:8080` para a interface. Isso permite rodar numa máquina nova sem configurar nada.
+
+`atualizacaoExe` é opcional: o caminho de um `portalnacional.exe` numa pasta compartilhada. Preenchido, o programa confere esse arquivo ao abrir e a cada hora e, se for uma versão diferente, se troca por ela e reinicia sozinho. Assim uma atualização chega a todas as máquinas copiando o exe para um lugar só.
 
 O `config.json` não vai para o controle de versão, porque contém caminhos internos. O arquivo `clientes.exemplo.csv` mostra o formato esperado da lista de empresas.
 

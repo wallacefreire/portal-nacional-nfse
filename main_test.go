@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -354,4 +355,74 @@ func TestIsTemporaryBuild(t *testing.T) {
 			t.Errorf("%s: deu %v, esperava %v", c.exe, got, c.want)
 		}
 	}
+}
+
+func fakeExe(size int, fill byte) []byte {
+	data := bytes.Repeat([]byte{fill}, size)
+	copy(data, "MZ")
+	return data
+}
+
+func TestApplyUpdate(t *testing.T) {
+	setup := func(t *testing.T, current, incoming []byte) (string, string) {
+		dir := t.TempDir()
+		exe := filepath.Join(dir, "portalnacional.exe")
+		source := filepath.Join(dir, "drive", "portalnacional.exe")
+		writeTestFile(t, source)
+		if err := os.WriteFile(exe, current, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(source, incoming, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return exe, source
+	}
+
+	t.Run("versão igual não faz nada", func(t *testing.T) {
+		same := fakeExe(minimumExeSize, 1)
+		exe, source := setup(t, same, same)
+		if updated, err := applyUpdate(source, exe); updated || err != nil {
+			t.Fatalf("não devia atualizar: %v, %v", updated, err)
+		}
+	})
+
+	t.Run("versão nova entra e a antiga fica guardada", func(t *testing.T) {
+		old, fresh := fakeExe(minimumExeSize, 1), fakeExe(minimumExeSize, 2)
+		exe, source := setup(t, old, fresh)
+
+		updated, err := applyUpdate(source, exe)
+		if !updated || err != nil {
+			t.Fatalf("devia atualizar: %v, %v", updated, err)
+		}
+		if got, _ := os.ReadFile(exe); !bytes.Equal(got, fresh) {
+			t.Error("o executável não foi trocado")
+		}
+		if got, _ := os.ReadFile(exe + ".antigo"); !bytes.Equal(got, old) {
+			t.Error("a versão anterior não foi guardada")
+		}
+		if _, err := os.Stat(exe + ".novo"); !errors.Is(err, os.ErrNotExist) {
+			t.Error("sobrou o arquivo temporário")
+		}
+	})
+
+	t.Run("arquivo pela metade é recusado", func(t *testing.T) {
+		old := fakeExe(minimumExeSize, 1)
+		exe, source := setup(t, old, fakeExe(1000, 2))
+
+		if updated, err := applyUpdate(source, exe); updated || err == nil {
+			t.Fatalf("devia recusar: %v, %v", updated, err)
+		}
+		if got, _ := os.ReadFile(exe); !bytes.Equal(got, old) {
+			t.Error("o executável atual foi mexido")
+		}
+	})
+
+	t.Run("arquivo que não é executável é recusado", func(t *testing.T) {
+		old := fakeExe(minimumExeSize, 1)
+		exe, source := setup(t, old, bytes.Repeat([]byte{3}, minimumExeSize))
+
+		if updated, err := applyUpdate(source, exe); updated || err == nil {
+			t.Fatalf("devia recusar: %v, %v", updated, err)
+		}
+	})
 }

@@ -116,6 +116,12 @@ func serveWeb(config Config, address string, showPage bool) error {
 	url := "http://" + address
 
 	listener, err := net.Listen("tcp", address)
+	if err != nil && os.Getenv(updatedEnv) == "1" {
+		for attempt := 0; attempt < 30 && err != nil; attempt++ {
+			time.Sleep(500 * time.Millisecond)
+			listener, err = net.Listen("tcp", address)
+		}
+	}
 	if err != nil {
 		running, dialErr := net.DialTimeout("tcp", address, time.Second)
 		if dialErr != nil {
